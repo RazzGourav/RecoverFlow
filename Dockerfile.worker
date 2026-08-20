@@ -15,11 +15,12 @@ COPY apps/api/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY apps/api/ .
+COPY integrations/ ./integrations/
+COPY workers/ ./workers/
 
 RUN useradd -r -u 1001 -g root recoverflow \
     && chown -R recoverflow:root /app
 USER recoverflow
 
 # Workers do not expose HTTP ports.
-# Phase 1 will replace this placeholder with `arq workers.event_worker.WorkerSettings`
-CMD ["python", "-c", "import time; print('worker placeholder — Phase 1 implements event_worker'); time.sleep(3600)"]
+CMD ["arq", "workers.event_worker.worker.WorkerSettings"]

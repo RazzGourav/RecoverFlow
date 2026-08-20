@@ -13,3 +13,5 @@ httpx==0.28.1
 python-multipart==0.0.20
 redis==5.2.1
 arq==0.26.1
+razorpay==1.4.1
+psycopg2-binary==2.9.9

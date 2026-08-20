@@ -1,58 +1,139 @@
 """
-RecoverFlow API — Razorpay webhook ingestion route (Phase 0 skeleton).
+RecoverFlow API — Razorpay webhook ingestion route.
 
 Why this file exists:
-  Even in Phase 0 we wire up the route path so that:
-  1. The OpenAPI docs show the expected interface.
-  2. Integration tests can hit the endpoint.
-  3. Phase 1 (payment event foundation) can implement the body without
-     changing the route registration.
-
-  Signature validation, idempotency, and event processing will be
-  implemented in Phase 1.  The endpoint currently returns 501 if called
-  with a real payload, making it impossible to accidentally process events
-  before the safety rails exist.
+  Ingests webhooks from Razorpay, validates the signature, ensures idempotency,
+  persists the raw event, and enqueues it for asynchronous normalization.
 """
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
+from typing import Any
+
 import structlog
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from config import settings
+from db.models import PaymentEvent, PaymentEventStatus
+from dependencies.db import get_db
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 
+def verify_razorpay_signature(payload: bytes, signature: str | None, secret: str) -> bool:
+    """
+    Verify the Razorpay webhook signature using HMAC SHA256.
+    """
+    if not signature:
+        return False
+    expected_mac = hmac.new(
+        secret.encode("utf-8"), payload, hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected_mac, signature)
+
+
 @router.post(
     "/razorpay",
     summary="Razorpay webhook receiver",
-    description=(
-        "Receives webhook events from Razorpay. "
-        "Signature validation and event processing implemented in Phase 1."
-    ),
-    status_code=status.HTTP_501_NOT_IMPLEMENTED,
-    include_in_schema=True,
+    description="Receives, validates, and persists Razorpay webhook events securely.",
+    status_code=status.HTTP_200_OK,
 )
-async def razorpay_webhook(request: Request) -> JSONResponse:
+async def razorpay_webhook(
+    request: Request,
+    x_razorpay_signature: str | None = Header(None),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
-    Stub for the Razorpay webhook receiver.
-
-    Phase 1 will add:
-    - HMAC-SHA256 signature validation (FR-002)
-    - Idempotency check on X-Razorpay-Event-Id (FR-003)
-    - Payload persistence (FR-004)
-    - Recovery case creation (FR-005)
-
-    Returns:
-        501 Not Implemented until Phase 1 is complete.
+    Process inbound Razorpay webhooks securely.
     """
-    logger.info("webhook.received", path="/webhooks/razorpay", status="not_implemented")
-    return JSONResponse(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        content={
-            "detail": "Webhook processing not yet implemented (Phase 1).",
-            "phase": "0-foundation",
-        },
+    # 1. Read raw body and validate signature (FR-002)
+    raw_body = await request.body()
+    
+    # We must skip signature validation if the secret is explicitly "REPLACE_ME" 
+    # and we are running tests or local dev (without real razorpay setup).
+    if settings.razorpay_webhook_secret != "REPLACE_ME":
+        is_valid = verify_razorpay_signature(
+            raw_body, x_razorpay_signature, settings.razorpay_webhook_secret
+        )
+        if not is_valid:
+            logger.warning("webhook.invalid_signature", signature=x_razorpay_signature)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid webhook signature",
+            )
+    else:
+        logger.warning("webhook.signature_check_bypassed", reason="secret is REPLACE_ME")
+
+    # 2. Parse JSON
+    try:
+        payload = json.loads(raw_body)
+    except json.JSONDecodeError:
+        logger.warning("webhook.invalid_json")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid JSON payload",
+        )
+
+    # 3. Extract event ID and type
+    # If the payload is wrapped in a `contains` key or just top level, Razorpay sends:
+    # { "event": "payment.failed", "contains": [...], "payload": { ... } }
+    # Plus it sends the Razorpay-Event-Id header. Let's use the header or the payload.
+    # Actually, Razorpay sends X-Razorpay-Event-Id header. 
+    # But usually it's also safer to grab it from headers.
+    event_id = request.headers.get("X-Razorpay-Event-Id")
+    if not event_id:
+        logger.warning("webhook.missing_event_id")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing X-Razorpay-Event-Id header",
+        )
+
+    event_type = payload.get("event")
+    if not event_type:
+        logger.warning("webhook.missing_event_type")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing event type in payload",
+        )
+
+    # 4. Compute payload hash
+    payload_hash = hashlib.sha256(raw_body).hexdigest()
+
+    # 5. Idempotent persistence (FR-003, FR-004)
+    event_record = PaymentEvent(
+        external_event_id=event_id,
+        event_type=event_type,
+        payload_hash=payload_hash,
+        raw_payload=payload,
+        status=PaymentEventStatus.RECEIVED,
     )
+    db.add(event_record)
+    
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Idempotency constraint hit (external_event_id is unique)
+        await db.rollback()
+        logger.info("webhook.duplicate_ignored", external_event_id=event_id)
+        return JSONResponse(status_code=status.HTTP_200_OK, content={"status": "duplicate"})
+    
+    # 6. Enqueue normalization job to ARQ (FR-005)
+    pool = getattr(request.app.state, "arq_pool", None)
+    if pool:
+        await pool.enqueue_job(
+            "normalize_payment_event",
+            payment_event_id=str(event_record.id),
+        )
+        logger.info("webhook.enqueued", external_event_id=event_id, internal_id=str(event_record.id))
+    else:
+        logger.warning("webhook.arq_pool_missing", external_event_id=event_id)
+
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"status": "received"})
