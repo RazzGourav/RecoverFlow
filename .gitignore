@@ -1,0 +1,79 @@
+# =============================================================================
+# RecoverFlow .gitignore
+# =============================================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+.env
+!.env.example
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker
+.docker/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data files (large datasets must not be committed)
+data/raw/*.csv
+data/raw/*.json
+data/raw/*.parquet
+data/synthetic/*.csv
+data/synthetic/*.json
+data/synthetic/*.parquet
+data/processed/*.csv
+data/processed/*.json
+data/processed/*.parquet
+
+# ML models (binary artifacts managed separately)
+ai/**/*.pkl
+ai/**/*.joblib
+ai/**/*.onnx
+ai/**/*.pt
+ai/**/*.bin
+
+# Evaluation reports
+evaluation/reports/*.pdf
+
+# Logs
+*.log
+logs/

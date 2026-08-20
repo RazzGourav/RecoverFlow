@@ -1,0 +1,25 @@
+FROM python:3.12-slim AS base
+
+# Why: Workers share the same codebase as the API — they just have a
+# different CMD.  Using the same base image and requirements ensures
+# no version skew between the two.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY apps/api/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY apps/api/ .
+
+RUN useradd -r -u 1001 -g root recoverflow \
+    && chown -R recoverflow:root /app
+USER recoverflow
+
+# Workers do not expose HTTP ports.
+# Phase 1 will replace this placeholder with `arq workers.event_worker.WorkerSettings`
+CMD ["python", "-c", "import time; print('worker placeholder — Phase 1 implements event_worker'); time.sleep(3600)"]

@@ -1,0 +1,176 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================================
+   RecoverFlow Global Styles
+   =========================================================================
+   Why: CSS custom properties (design tokens) are defined here so that
+   non-Tailwind contexts (e.g., SVG fills, dynamic inline styles) can
+   reference the same colour values without duplication.
+   ========================================================================= */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
+
+/* -------------------------------------------------------------------------
+   CSS Custom Properties (Design Tokens)
+   ------------------------------------------------------------------------- */
+:root {
+  /* Brand */
+  --color-brand-primary: #6366f1;
+  --color-brand-secondary: #818cf8;
+  --color-brand-dark: #4338ca;
+
+  /* Surfaces */
+  --color-surface-900: #0a0a14;
+  --color-surface-800: #111121;
+  --color-surface-700: #1a1a2e;
+  --color-surface-600: #22223a;
+
+  /* Status */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+
+  /* Text */
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+
+  /* Spacing scale (matches Tailwind, kept for clarity) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-4: 1rem;
+  --space-8: 2rem;
+  --space-16: 4rem;
+
+  /* Border radius tokens */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+
+  /* Shadow tokens */
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3);
+}
+
+/* -------------------------------------------------------------------------
+   Base Styles
+   ------------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-surface-900);
+  color: var(--color-text-primary);
+  font-family: "Inter", system-ui, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  min-height: 100dvh;
+}
+
+/* -------------------------------------------------------------------------
+   Component Layer — Reusable classes
+   ------------------------------------------------------------------------- */
+@layer components {
+  /* Glass card */
+  .glass-card {
+    @apply bg-surface-800/60 backdrop-blur-md border border-surface-600/50 rounded-2xl;
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Primary gradient button */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-xl
+           bg-gradient-to-r from-brand-500 to-brand-600
+           text-white font-semibold text-sm
+           shadow-glow hover:shadow-glow-success
+           transition-all duration-200
+           hover:from-brand-600 hover:to-brand-700
+           active:scale-95 focus:outline-none focus:ring-2 focus:ring-brand-400;
+  }
+
+  /* Metric card for dashboard numbers */
+  .metric-card {
+    @apply glass-card p-6 flex flex-col gap-1;
+  }
+
+  .metric-value {
+    @apply text-3xl font-bold text-text-primary tabular-nums;
+  }
+
+  .metric-label {
+    @apply text-xs font-medium text-text-muted uppercase tracking-wider;
+  }
+
+  /* Status badge */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-2xs font-semibold uppercase tracking-wider;
+  }
+  .badge-success {
+    @apply badge bg-success/10 text-success border border-success/20;
+  }
+  .badge-danger {
+    @apply badge bg-danger/10 text-danger border border-danger/20;
+  }
+  .badge-warning {
+    @apply badge bg-warning/10 text-warning border border-warning/20;
+  }
+  .badge-info {
+    @apply badge bg-info/10 text-info border border-info/20;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Utility Layer — One-off utilities
+   ------------------------------------------------------------------------- */
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-brand-300 via-brand-400 to-brand-500 bg-clip-text text-transparent;
+  }
+
+  .border-gradient {
+    border-image: linear-gradient(135deg, #6366f1, #818cf8) 1;
+  }
+
+  /* Shimmer loading animation */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.04) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
+
+  /* Scrollbar styling */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-surface-600) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: var(--color-surface-600);
+    border-radius: 2px;
+  }
+}

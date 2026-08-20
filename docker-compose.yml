@@ -1,0 +1,177 @@
+# =============================================================================
+# RecoverFlow — Docker Compose
+# =============================================================================
+# Usage:
+#   cp .env.example .env
+#   docker compose up --build
+#
+# Services:
+#   postgres  — PostgreSQL 16 database
+#   redis     — Redis 7 task queue / cache
+#   api       — FastAPI backend (auto-applies Alembic migrations on start)
+#   worker    — arq background worker (Phase 1 implements full logic)
+#   frontend  — Next.js 14 App Router
+# =============================================================================
+
+version: "3.9"
+
+# ---------------------------------------------------------------------------
+# Named volumes — persistent data survives container restarts.
+# ---------------------------------------------------------------------------
+volumes:
+  postgres_data:
+  redis_data:
+
+# ---------------------------------------------------------------------------
+# Shared network — all services communicate by service name.
+# ---------------------------------------------------------------------------
+networks:
+  recoverflow:
+    driver: bridge
+
+# ---------------------------------------------------------------------------
+# Services
+# ---------------------------------------------------------------------------
+services:
+
+  # -------------------------------------------------------------------------
+  # PostgreSQL 16
+  # -------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: recoverflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: recoverflow
+      POSTGRES_USER: recoverflow
+      POSTGRES_PASSWORD: recoverflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - recoverflow
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recoverflow -d recoverflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # -------------------------------------------------------------------------
+  # Redis 7
+  # -------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: recoverflow-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    networks:
+      - recoverflow
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -------------------------------------------------------------------------
+  # FastAPI — runs Alembic migrations before starting uvicorn.
+  #
+  # Why run migrations in the same container as the API?
+  # For this development setup it's safe and simple.  A dedicated
+  # migration init-container would be used in production.
+  # -------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: recoverflow-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://recoverflow:recoverflow@postgres:5432/recoverflow
+      DATABASE_SYNC_URL: postgresql://recoverflow:recoverflow@postgres:5432/recoverflow
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: "http://localhost:3000,http://frontend:3000"
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+    # Override CMD: run migrations then start uvicorn.
+    command: >
+      sh -c "
+        echo 'Waiting for Postgres...' &&
+        sleep 3 &&
+        alembic upgrade head &&
+        echo 'Migrations applied. Starting API...' &&
+        uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1 --log-level info
+      "
+    ports:
+      - "8000:8000"
+    networks:
+      - recoverflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+
+  # -------------------------------------------------------------------------
+  # Background Worker (Phase 0 placeholder)
+  # -------------------------------------------------------------------------
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: recoverflow-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://recoverflow:recoverflow@postgres:5432/recoverflow
+      DATABASE_SYNC_URL: postgresql://recoverflow:recoverflow@postgres:5432/recoverflow
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+    networks:
+      - recoverflow
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # -------------------------------------------------------------------------
+  # Next.js Frontend
+  # -------------------------------------------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    container_name: recoverflow-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      INTERNAL_API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    networks:
+      - recoverflow
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 5

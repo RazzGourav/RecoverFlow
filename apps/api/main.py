@@ -1,0 +1,131 @@
+"""
+RecoverFlow API — application entry point.
+
+Why this file exists:
+  The FastAPI application factory lives here.  Every router, middleware, and
+  lifespan hook is registered in one place so that:
+  - Tests can import `app` directly without starting a server.
+  - The Dockerfile CMD runs `uvicorn main:app` without any path gymnastics.
+  - Future phases add new routers by appending to the `include_router` list.
+"""
+
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+from typing import Any
+
+import structlog
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from config import settings
+from routes.health import router as health_router
+from routes.webhooks import router as webhooks_router
+
+# ---------------------------------------------------------------------------
+# Structured logging configuration
+# Why: print()-based logging is forbidden by AGENTS.md.  structlog is
+# configured once here and imported everywhere else via `structlog.get_logger`.
+# ---------------------------------------------------------------------------
+structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.dev.ConsoleRenderer()
+        if settings.environment == "development"
+        else structlog.processors.JSONRenderer(),
+    ],
+    wrapper_class=structlog.make_filtering_bound_logger(
+        getattr(__import__("logging"), settings.log_level)
+    ),
+    context_class=dict,
+    logger_factory=structlog.PrintLoggerFactory(),
+)
+
+logger = structlog.get_logger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Lifespan — runs at startup and shutdown.
+# ---------------------------------------------------------------------------
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):  # type: ignore[type-arg]
+    """
+    Application lifespan manager.
+
+    Startup: verify database connectivity and log readiness.
+    Shutdown: dispose engine connections cleanly.
+    """
+    from db.session import engine
+
+    logger.info(
+        "api.starting",
+        environment=settings.environment,
+        autonomous_actions_enabled=settings.autonomous_actions_enabled,
+    )
+
+    # Verify DB is reachable before accepting traffic
+    try:
+        async with engine.connect() as conn:
+            from sqlalchemy import text
+
+            await conn.execute(text("SELECT 1"))
+        logger.info("api.db_connected")
+    except Exception as exc:
+        logger.error("api.db_connection_failed", error=str(exc))
+        # Do not prevent startup — let the health endpoint surface degraded state.
+
+    yield  # Application is running
+
+    logger.info("api.shutting_down")
+    await engine.dispose()
+    logger.info("api.shutdown_complete")
+
+
+# ---------------------------------------------------------------------------
+# Application factory
+# ---------------------------------------------------------------------------
+
+
+def create_app() -> FastAPI:
+    """
+    Create and configure the FastAPI application.
+
+    Returns:
+        A configured FastAPI instance ready to be served.
+    """
+    app = FastAPI(
+        title="RecoverFlow API",
+        description=(
+            "AI Revenue Recovery Control Plane — "
+            "determines which revenue is worth recovering, "
+            "selects the safest intervention, executes under merchant-defined limits, "
+            "verifies financial outcomes, and measures incremental recovery."
+        ),
+        version="0.1.0",
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
+        lifespan=lifespan,
+    )
+
+    # --- CORS ---------------------------------------------------------------
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # --- Routers ------------------------------------------------------------
+    app.include_router(health_router)
+    app.include_router(webhooks_router)
+
+    return app
+
+
+app = create_app()
