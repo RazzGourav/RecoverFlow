@@ -17,6 +17,7 @@ from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock
 
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,7 +39,7 @@ async def _mock_db() -> AsyncGenerator[AsyncSession, None]:
     yield mock  # type: ignore[misc]
 
 
-@pytest.fixture()
+@pytest_asyncio.fixture()
 async def client() -> AsyncGenerator[AsyncClient, None]:
     """
     Provide an async HTTP test client for the FastAPI app.
