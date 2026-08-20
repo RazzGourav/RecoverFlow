@@ -43,23 +43,3 @@ async def test_health_phase_field(client: AsyncClient) -> None:
 
     assert "phase" in data
     assert data["phase"] == "0-foundation"
-
-
-@pytest.mark.asyncio
-async def test_webhook_endpoint_returns_501(client: AsyncClient) -> None:
-    """Webhook endpoint must return 501 in Phase 0 (not yet implemented)."""
-    response = await client.post(
-        "/webhooks/razorpay",
-        json={"event": "payment.failed", "payload": {}},
-    )
-    assert response.status_code == 501
-
-
-@pytest.mark.asyncio
-async def test_webhook_response_has_detail(client: AsyncClient) -> None:
-    """Webhook 501 response must explain why it's not implemented."""
-    response = await client.post("/webhooks/razorpay", json={})
-    data = response.json()
-
-    assert "detail" in data
-    assert "Phase 1" in data["detail"]

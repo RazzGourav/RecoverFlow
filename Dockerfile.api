@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the API source
 COPY apps/api/ .
+COPY integrations/ ./integrations/
 
 # Create a non-root user for the running process.
 # Why: Running as root inside a container is a security anti-pattern.

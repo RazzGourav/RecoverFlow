@@ -215,9 +215,8 @@ make smoke       # Run smoke tests
 
 | Phase | Name | Status |
 |---|---|---|
-| **0** | Foundation — repo, schema, Docker, CI | ✅ Complete |
-| 1 | Payment Event Foundation | 🔲 Upcoming |
-| 2 | Recovery Data Engine | 🔲 Upcoming |
+| Phase 0 | Foundation & Structure | ✅ Complete | Repository skeleton, Docker Compose, DB schemas, CI pipeline |
+| Phase 1 | Payment Events | ✅ Complete | Webhook signature validation, idempotency, failure mapping, PaymentProvider abstractions |
 | 3 | ML Engine | 🔲 Upcoming |
 | 4 | Decision Engine | 🔲 Upcoming |
 | 5 | LLM Reasoning | 🔲 Upcoming |

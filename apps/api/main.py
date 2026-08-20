@@ -56,10 +56,12 @@ async def lifespan(app: FastAPI):  # type: ignore[type-arg]
     """
     Application lifespan manager.
 
-    Startup: verify database connectivity and log readiness.
-    Shutdown: dispose engine connections cleanly.
+    Startup: verify database connectivity, initialize redis pool, and log readiness.
+    Shutdown: dispose engine connections and close redis pool cleanly.
     """
     from db.session import engine
+    from arq import create_pool
+    from arq.connections import RedisSettings
 
     logger.info(
         "api.starting",
@@ -78,9 +80,20 @@ async def lifespan(app: FastAPI):  # type: ignore[type-arg]
         logger.error("api.db_connection_failed", error=str(exc))
         # Do not prevent startup — let the health endpoint surface degraded state.
 
+    # Initialize ARQ Redis pool for enqueueing background jobs
+    try:
+        redis_settings = RedisSettings.from_dsn(settings.redis_url)
+        app.state.arq_pool = await create_pool(redis_settings)
+        logger.info("api.redis_connected")
+    except Exception as exc:
+        logger.error("api.redis_connection_failed", error=str(exc))
+        app.state.arq_pool = None
+
     yield  # Application is running
 
     logger.info("api.shutting_down")
+    if getattr(app.state, "arq_pool", None):
+        await app.state.arq_pool.close()
     await engine.dispose()
     logger.info("api.shutdown_complete")
 

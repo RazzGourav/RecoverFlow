@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # --- Razorpay ----------------------------------------------------------
+    payment_provider: str = "mock"
     razorpay_key_id: str = "rzp_test_REPLACE_ME"
     razorpay_key_secret: str = "REPLACE_ME"
     razorpay_webhook_secret: str = "REPLACE_ME"
