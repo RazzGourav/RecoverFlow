@@ -218,7 +218,7 @@ make smoke       # Run smoke tests
 | Phase 0 | Foundation & Structure | ✅ Complete | Repository skeleton, Docker Compose, DB schemas, CI pipeline |
 | Phase 1 | Payment Events | ✅ Complete | Webhook signature validation, idempotency, failure mapping, PaymentProvider abstractions |
 | Phase 2 | Recovery Data Engine | ✅ Complete | Synthetic dataset, dataset card, DB seeding |
-| 3 | ML Engine | 🔲 Upcoming | |
+| Phase 3 | ML Engine | ✅ Complete | Recoverability predictor, action effectiveness, risk firewall |
 | 4 | Decision Engine | 🔲 Upcoming | |
 | 5 | LLM Reasoning | 🔲 Upcoming | |
 | 6 | Risk Firewall | 🔲 Upcoming | |

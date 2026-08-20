@@ -24,6 +24,7 @@ help:
 	@echo "  make smoke       Run smoke test script"
 	@echo "  make clean       Remove all containers, volumes, and images"
 	@echo "  make seed-db     Seed the local database with synthetic cases"
+	@echo "  make train       Train ML models and save artifacts"
 	@echo ""
 
 # Start services (attach mode — Ctrl+C stops them).
@@ -60,6 +61,13 @@ seed-db:
 	@echo ">>> Generating synthetic dataset (if missing) and seeding DB..."
 	docker compose exec api python /app/../../data/synthetic/generate.py
 	docker compose exec api python /app/../../scripts/seed_db.py
+
+# Train ML models.
+train:
+	@echo ">>> Training Recovery Model..."
+	docker compose exec api python /app/../../ai/models/recovery/train.py
+	@echo ">>> Training Action Effectiveness Model..."
+	docker compose exec api python /app/../../ai/models/intervention/train.py
 
 # Run linter.
 lint:
