@@ -23,6 +23,7 @@ help:
 	@echo "  make typecheck   Run mypy type checker on the API"
 	@echo "  make smoke       Run smoke test script"
 	@echo "  make clean       Remove all containers, volumes, and images"
+	@echo "  make seed-db     Seed the local database with synthetic cases"
 	@echo ""
 
 # Start services (attach mode — Ctrl+C stops them).
@@ -53,6 +54,12 @@ migrate:
 test:
 	@echo ">>> Running backend tests..."
 	docker compose exec api pytest -q /app/../../tests/
+
+# Seed the database with synthetic cases for local dev.
+seed-db:
+	@echo ">>> Generating synthetic dataset (if missing) and seeding DB..."
+	docker compose exec api python /app/../../data/synthetic/generate.py
+	docker compose exec api python /app/../../scripts/seed_db.py
 
 # Run linter.
 lint:
