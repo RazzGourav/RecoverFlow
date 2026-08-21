@@ -6,7 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 
-from apps.api.db.models import Session, FunnelEvent, FunnelEventType
+try:
+    from db.models import Session, FunnelEvent, FunnelEventType
+except ImportError:
+    from apps.api.db.models import Session, FunnelEvent, FunnelEventType
 from integrations.analytics.base import EventTrackingProvider, FunnelSummaryNode
 
 logger = structlog.get_logger(__name__)

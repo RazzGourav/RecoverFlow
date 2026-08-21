@@ -1,4 +1,3 @@
-from integrations.analytics.base import EventTrackingProvider
-from integrations.analytics.synthetic import SyntheticProvider
+"""Analytics event tracking providers."""
 
 __all__ = ["EventTrackingProvider", "SyntheticProvider"]
