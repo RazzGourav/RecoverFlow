@@ -134,4 +134,23 @@ Format: | Item | Reason | Target Phase | GitHub Issue |
 - Added integration test verifying stage counts match raw DB queries.
 
 **Next session read first:**
-- Phase 10 (Simulation Lab / Dashboard Polish).
+- Phase 11 (Simulation Lab / Dashboard Polish).
+
+### Session Summary: Phase 10 (Dashboard Implementation)
+**What was done:**
+- Built Revenue Control Tower (`app/page.tsx`) connecting to backend `/dashboard/feed` and `/metrics`.
+- Built Recovery Cases table (`app/cases/page.tsx`) and Case Intelligence view (`app/cases/[id]/page.tsx`) with real API data.
+- Built Policy Studio (`app/policies/page.tsx`) connected to `/policies` API.
+- Built Audit Explorer (`app/audit/page.tsx`) connected to `/audit` API.
+- Re-architected `LeakGraph` to safely load inside `app/page.tsx` avoiding a client-side `useEffect` loop that crashed browsers.
+- Fixed a SQLAlchemy `foreign_keys` ambiguity in `RecoveryCase` and `PaymentEvent` models.
+- Established global loading states (`app/loading.tsx`).
+- Created a top-level `.dockerignore` to optimize docker build times by ignoring `node_modules` and `.next`.
+- All `vitest` and `tsc` typechecks pass cleanly.
+
+**What's still open:**
+- Nothing for Phase 10! The Dashboard is complete and functionally wired to real backend endpoints. 
+
+**Next session read first:**
+- You are ready for Phase 11 (Simulation Lab) or Phase 12 (Failure Center).
+- Ensure `docker compose up --build -d` runs successfully on your machine.

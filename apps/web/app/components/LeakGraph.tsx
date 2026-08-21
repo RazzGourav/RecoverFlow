@@ -62,7 +62,7 @@ interface FunnelStage {
   data_source: "simulated" | "live";
 }
 
-interface LeakGraphData {
+export interface LeakGraphData {
   stages: FunnelStage[];
   leaks: LeakPoint[];
   generated_at: string;
@@ -107,13 +107,14 @@ function formatCount(n: number): string {
 // Component
 // ---------------------------------------------------------------------------
 
-export function LeakGraph(): React.JSX.Element {
-  const [data, setData] = useState<LeakGraphData | null>(null);
-  const [loading, setLoading] = useState(true);
+export function LeakGraph({ initialData }: { initialData?: LeakGraphData | null } = {}): React.JSX.Element {
+  const [data, setData] = useState<LeakGraphData | null>(initialData || null);
+  const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
   const [selectedLeak, setSelectedLeak] = useState<LeakPoint | null>(null);
 
   useEffect(() => {
+    if (initialData) return;
     fetch("/api/leak-graph")
       .then((r) => {
         if (!r.ok) throw new Error(`API error: ${r.status}`);

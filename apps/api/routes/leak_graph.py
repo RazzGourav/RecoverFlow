@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, case as sql_case
+from sqlalchemy import select, func, case as sql_case, Integer
 
 from dependencies.db import get_db
 
@@ -19,13 +19,13 @@ try:
     from db.models import (
         FunnelEvent, FunnelEventType, PaymentEvent,
         RecoveryCase, CandidateAction, ReconciliationRecord,
-        ReconciliationStatus, CaseStatus, ActionType
+        ReconciliationStatus, CaseStatus, ActionType, Customer
     )
 except ImportError:
     from apps.api.db.models import (
         FunnelEvent, FunnelEventType, PaymentEvent,
         RecoveryCase, CandidateAction, ReconciliationRecord,
-        ReconciliationStatus, CaseStatus, ActionType
+        ReconciliationStatus, CaseStatus, ActionType, Customer
     )
 
 router = APIRouter()
@@ -109,8 +109,10 @@ async def get_leak_graph(db: AsyncSession = Depends(get_db)):
     # 2. Payment success counts (from payment_events — live data)
     success_stmt = select(
         func.count(PaymentEvent.id),
-        func.coalesce(func.sum(PaymentEvent.amount_paise), 0)
-    ).where(PaymentEvent.status == "captured")
+        func.coalesce(func.sum(
+            func.cast(PaymentEvent.raw_payload['payload']['payment']['entity']['amount'].astext, Integer)
+        ), 0)
+    ).where(PaymentEvent.event_type == "payment.captured")
     success_result = await db.execute(success_stmt)
     success_row = success_result.one()
     success_count = success_row[0]
@@ -178,12 +180,19 @@ async def get_leak_graph(db: AsyncSession = Depends(get_db)):
 
         # Only payment-stage leaks have recovery_cases data for drill-through
         if from_stage.stage in ("PAYMENT_ATTEMPTED", "CHECKOUT_STARTED"):
-            # Root cause breakdown from recovery_cases
+            # Root cause breakdown from recovery_cases via genuine multi-table join
             rc_stmt = select(
                 RecoveryCase.failure_type,
                 func.count(RecoveryCase.id),
                 func.coalesce(func.sum(RecoveryCase.amount_paise), 0)
+            ).join(
+                PaymentEvent, PaymentEvent.recovery_case_id == RecoveryCase.id
+            ).join(
+                FunnelEvent, FunnelEvent.session_id == PaymentEvent.session_id
+            ).where(
+                FunnelEvent.event_type == FunnelEventType.PAYMENT_ATTEMPTED
             ).group_by(RecoveryCase.failure_type)
+            
             rc_result = await db.execute(rc_stmt)
             for row in rc_result.all():
                 root_causes.append(RootCauseBreakdown(
@@ -192,24 +201,42 @@ async def get_leak_graph(db: AsyncSession = Depends(get_db)):
                     revenue_at_risk_paise=row[2]
                 ))
 
-            # Affected segment breakdown
+            # Affected segment breakdown via multi-table join
             seg_stmt = select(
-                RecoveryCase.customer_segment,
+                Customer.segment,
                 func.count(RecoveryCase.id)
-            ).group_by(RecoveryCase.customer_segment)
+            ).join(
+                PaymentEvent, PaymentEvent.recovery_case_id == RecoveryCase.id
+            ).join(
+                FunnelEvent, FunnelEvent.session_id == PaymentEvent.session_id
+            ).join(
+                Customer, Customer.id == RecoveryCase.customer_id
+            ).where(
+                FunnelEvent.event_type == FunnelEventType.PAYMENT_ATTEMPTED
+            ).group_by(Customer.segment)
+            
             seg_result = await db.execute(seg_stmt)
             for row in seg_result.all():
                 affected_segments.append(SegmentBreakdown(
-                    segment=row[0] if row[0] else "UNKNOWN",
+                    segment=row[0].value if hasattr(row[0], 'value') else (row[0] if row[0] else "UNKNOWN"),
                     count=row[1]
                 ))
 
-            # Recovery actions summary
+            # Recovery actions summary via multi-table join
             ra_stmt = select(
                 CandidateAction.action_type,
                 func.count(CandidateAction.id),
                 func.coalesce(func.sum(CandidateAction.expected_value_paise), 0)
+            ).join(
+                RecoveryCase, RecoveryCase.id == CandidateAction.case_id
+            ).join(
+                PaymentEvent, PaymentEvent.recovery_case_id == RecoveryCase.id
+            ).join(
+                FunnelEvent, FunnelEvent.session_id == PaymentEvent.session_id
+            ).where(
+                FunnelEvent.event_type == FunnelEventType.PAYMENT_ATTEMPTED
             ).group_by(CandidateAction.action_type)
+            
             ra_result = await db.execute(ra_stmt)
             for row in ra_result.all():
                 recovery_actions.append(RecoveryActionSummary(

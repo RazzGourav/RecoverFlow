@@ -1,0 +1,10 @@
+node_modules/
+.next/
+.git/
+.venv/
+__pycache__/
+*.pyc
+apps/web/node_modules/
+apps/web/.next/
+apps/api/venv/
+.DS_Store

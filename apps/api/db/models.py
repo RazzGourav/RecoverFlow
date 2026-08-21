@@ -456,6 +456,12 @@ class RecoveryCase(Base):
     subscription: Mapped[Subscription | None] = relationship(
         back_populates="recovery_cases"
     )
+    customer: Mapped[Customer | None] = relationship(
+        foreign_keys="[RecoveryCase.customer_id]"
+    )
+    payment_event: Mapped[PaymentEvent | None] = relationship(
+        foreign_keys="[RecoveryCase.payment_event_id]"
+    )
     candidate_actions: Mapped[list[CandidateAction]] = relationship(
         back_populates="case"
     )
