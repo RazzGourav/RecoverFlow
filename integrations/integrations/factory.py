@@ -25,3 +25,19 @@ def get_provider() -> PaymentProvider:
         raise ValueError(
             f"Unsupported PAYMENT_PROVIDER: {settings.payment_provider}"
         )
+
+
+def get_validator():
+    """
+    Returns the appropriate validation function for the configured provider.
+    """
+    if settings.payment_provider.lower() == "razorpay":
+        from integrations.razorpay.validation import validate_action_against_live_state
+        return validate_action_against_live_state
+    elif settings.payment_provider.lower() == "mock":
+        from integrations.mock.validation import validate_action_against_live_state
+        return validate_action_against_live_state
+    else:
+        raise ValueError(
+            f"Unsupported PAYMENT_PROVIDER: {settings.payment_provider}"
+        )

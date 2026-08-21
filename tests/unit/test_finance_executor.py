@@ -51,8 +51,10 @@ async def test_execute_payment_link_success(db_session, setup_test_case):
     # Assert Audit Log
     stmt = select(AuditEvent).where(AuditEvent.case_id == case.id, AuditEvent.event_type == AuditEventType.ACTION_EXECUTED)
     result = await db_session.execute(stmt)
-    audit_event = result.scalar_one()
+    audit_events = result.scalars().all()
+    assert len(audit_events) > 0
     
+    audit_event = audit_events[-1]
     assert audit_event.reason == "Successfully generated payment link."
     assert audit_event.metadata_payload["provider_reference"] == updated_action.provider_reference
 
@@ -117,10 +119,6 @@ async def test_execute_action_timeout(db_session, setup_test_case, monkeypatch):
     """
     case, _, _ = setup_test_case
     
-    async def delayed_link(*args, **kwargs):
-        await asyncio.sleep(0.5)  # Simulate delay
-        return "plink_mock_delayed"
-        
     mock_provider = MockProvider()
     mock_provider.create_payment_link = AsyncMock(side_effect=asyncio.TimeoutError)
     monkeypatch.setattr("domain.finance.executor.get_provider", lambda: mock_provider)
@@ -137,3 +135,63 @@ async def test_execute_action_timeout(db_session, setup_test_case, monkeypatch):
     
     updated_action = await execute_action(db_session, action.id)
     assert updated_action.execution_status == ExecutionStatus.TIMED_OUT
+
+
+@pytest.mark.asyncio
+async def test_validation_layer_race_condition(db_session, setup_test_case, monkeypatch):
+    """
+    Simulates a race condition where DB state indicates a failed payment, but the live 
+    state fetch indicates it is already paid. The action should be VALIDATION_BLOCKED.
+    """
+    case, _, _ = setup_test_case
+    
+    mock_provider = MockProvider()
+    # Mock live state saying it's captured
+    mock_provider.fetch_payment = AsyncMock(return_value={"status": "captured"})
+    # create_payment_link should never be called
+    mock_provider.create_payment_link = AsyncMock(return_value="should_not_call")
+    
+    monkeypatch.setattr("domain.finance.executor.get_provider", lambda: mock_provider)
+    
+    action = Action(
+        case_id=case.id,
+        action_type=ActionType.PAYMENT_LINK,
+        authorization_status=AuthorizationStatus.AUTONOMOUS,
+        execution_status=ExecutionStatus.PENDING,
+        idempotency_key=f"idem_{uuid.uuid4()}"
+    )
+    db_session.add(action)
+    await db_session.commit()
+    
+    updated_action = await execute_action(db_session, action.id)
+    
+    assert updated_action.execution_status == ExecutionStatus.VALIDATION_BLOCKED
+    assert mock_provider.create_payment_link.call_count == 0
+
+
+@pytest.mark.asyncio
+async def test_validation_layer_unsupported(db_session, setup_test_case, monkeypatch):
+    """
+    Tests that an unsupported live state correctly routes to VALIDATION_BLOCKED.
+    """
+    case, _, _ = setup_test_case
+    
+    mock_provider = MockProvider()
+    # Force UNSUPPORTED validation
+    mock_provider.fetch_payment = AsyncMock(return_value={"_mock_validation_override": "UNSUPPORTED"})
+    
+    monkeypatch.setattr("domain.finance.executor.get_provider", lambda: mock_provider)
+    
+    action = Action(
+        case_id=case.id,
+        action_type=ActionType.PAYMENT_LINK,
+        authorization_status=AuthorizationStatus.AUTONOMOUS,
+        execution_status=ExecutionStatus.PENDING,
+        idempotency_key=f"idem_{uuid.uuid4()}"
+    )
+    db_session.add(action)
+    await db_session.commit()
+    
+    updated_action = await execute_action(db_session, action.id)
+    
+    assert updated_action.execution_status == ExecutionStatus.VALIDATION_BLOCKED

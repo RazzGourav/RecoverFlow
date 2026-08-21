@@ -87,10 +87,53 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
             f"Action {action_id} is not authorized for execution (status: {action.authorization_status})"
         )
 
-    # 3. Execution Phase
+    # 3. Validation Phase (Phase 7.5)
     case = action.case
     customer = case.customer
+    
+    provider = get_provider()
+    
+    # Fetch live state
+    try:
+        if case.external_payment_id:
+            live_state = await provider.fetch_payment(case.external_payment_id)
+        else:
+            live_state = {} # Should not happen usually, but handle gracefully
+    except Exception as e:
+        logger.warning("executor.live_state_fetch_failed", action_id=str(action.id), error=str(e))
+        live_state = {}
 
+    from integrations.factory import get_validator
+    from integrations.validation import ValidationStatus
+    
+    validator = get_validator()
+    validation_outcome = validator(action.action_type, live_state)
+    
+    if validation_outcome.status != ValidationStatus.VALID:
+        logger.info(
+            "validation_blocked",
+            action_id=str(action_id),
+            reason=validation_outcome.reason,
+            status=validation_outcome.status.value
+        )
+        action.execution_status = ExecutionStatus.VALIDATION_BLOCKED
+        
+        event = AuditEvent(
+            case_id=case.id,
+            event_type=AuditEventType.ACTION_EXECUTED, # Or RISK_FIREWALL_BLOCKED/similar if you add a new event type.
+            reason=f"Action blocked by validation layer: {validation_outcome.reason}",
+            actor="SYSTEM",
+            metadata_payload={
+                "action_id": str(action.id),
+                "action_type": action.action_type.value,
+                "validation_status": validation_outcome.status.value,
+            },
+        )
+        session.add(event)
+        await session.commit()
+        return action
+
+    # 4. Execution Phase
     logger.info(
         "executing_action",
         action_id=str(action_id),
@@ -100,8 +143,6 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
 
     action.execution_status = ExecutionStatus.EXECUTING
     await session.commit()
-
-    provider = get_provider()
 
     try:
         import asyncio
