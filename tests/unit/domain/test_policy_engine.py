@@ -6,7 +6,13 @@ Ensures that multiple rules are evaluated correctly and the strictest outcome wi
 
 from datetime import datetime, timedelta, timezone
 
-from domain.policies.engine import evaluate_action, OUTCOME_AUTONOMOUS, OUTCOME_HUMAN, OUTCOME_BLOCKED
+from domain.policies.engine import (
+    OUTCOME_AUTONOMOUS,
+    OUTCOME_BLOCKED,
+    OUTCOME_HUMAN,
+    evaluate_action,
+)
+
 
 def test_engine_all_clear():
     policy = {

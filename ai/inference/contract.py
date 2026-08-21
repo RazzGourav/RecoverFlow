@@ -8,8 +8,9 @@ Why this exists:
   critical path of financial recovery.
 """
 
-from typing import List
+
 from pydantic import BaseModel, Field
+
 
 class AIDecisionContract(BaseModel):
     case_id: str = Field(..., description="The unique UUID of the recovery case.")
@@ -20,5 +21,5 @@ class AIDecisionContract(BaseModel):
     expected_recovery: float = Field(..., description="Expected value in paise (prob * amount).")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence of the prediction.")
     human_approval_required: bool = Field(..., description="True if risk or amount requires human review.")
-    reason_codes: List[str] = Field(default_factory=list, description="Audit codes explaining the decision.")
+    reason_codes: list[str] = Field(default_factory=list, description="Audit codes explaining the decision.")
     model_version: str = Field(..., description="Version of the models used for this prediction.")

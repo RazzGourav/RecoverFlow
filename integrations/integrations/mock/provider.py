@@ -8,6 +8,7 @@ Why this file exists:
 """
 
 import uuid
+
 from integrations.base import PaymentProvider
 
 

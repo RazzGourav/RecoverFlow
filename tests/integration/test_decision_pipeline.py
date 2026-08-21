@@ -7,22 +7,28 @@ Why this exists:
   audit event is produced per decision.
 """
 
-import pytest
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import select
 
+import pytest
+import pytest_asyncio
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from apps.api.db.models import (
-    Merchant, RecoveryCase, 
-    Policy, CandidateAction, Action, AuditEvent,
-    FailureType, CaseStatus, AuthorizationStatus
+    Action,
+    AuditEvent,
+    AuditEventType,
+    AuthorizationStatus,
+    CandidateAction,
+    CaseStatus,
+    FailureType,
+    Merchant,
+    Policy,
+    RecoveryCase,
 )
 from domain.policies.pipeline import run_decision_pipeline
-
-import pytest_asyncio
 
 TEST_DATABASE_URL = "postgresql+asyncpg://recoverflow:recoverflow@postgres:5432/recoverflow"
 
@@ -77,9 +83,21 @@ async def test_decision_pipeline_creates_audit_event_and_action(db_engine_and_se
         
         audit_res = await db_session.execute(select(AuditEvent).where(AuditEvent.case_id == case.id))
         audit_events = audit_res.scalars().all()
-        assert len(audit_events) == 1
+        # Phase 6: pipeline now emits 2 events — one Risk Firewall event (RISK_FIREWALL_EVALUATED
+        # or RISK_FIREWALL_BLOCKED) and one Policy Engine event (ACTION_AUTHORIZED etc.)
+        assert len(audit_events) >= 1
         
-        audit = audit_events[0]
+        # Policy engine events have event_type in the policy domain
+        POLICY_EVENT_TYPES = {
+            AuditEventType.ACTION_AUTHORIZED,
+            AuditEventType.HUMAN_ESCALATION,
+            AuditEventType.ACTION_BLOCKED,
+            AuditEventType.POLICY_EVALUATED,
+            AuditEventType.LLM_EXPLANATION_FAILED,
+        }
+        policy_events = [e for e in audit_events if e.event_type in POLICY_EVENT_TYPES]
+        assert len(policy_events) >= 1, "At least one Policy Engine audit event required"
+        audit = policy_events[0]
         assert audit.policy_version == "1.0.0"
         assert audit.model_version is not None
         assert audit.decision in ["AUTONOMOUS", "AWAITING_HUMAN", "BLOCKED"]
@@ -130,8 +148,14 @@ async def test_decision_pipeline_blocks_repeated_action(db_engine_and_session):
         audit_res = await db_session.execute(
             select(AuditEvent)
             .where(AuditEvent.case_id == case.id)
-            .order_by(AuditEvent.timestamp.desc())
         )
-        audit = audit_res.scalars().first()
+        all_audit_events = audit_res.scalars().all()
+        # Phase 6: find the Policy Engine audit event (event_type = ACTION_BLOCKED)
+        policy_audits = [
+            e for e in all_audit_events
+            if e.event_type == AuditEventType.ACTION_BLOCKED and e.decision == "BLOCKED"
+        ]
+        assert len(policy_audits) >= 1, "Expected a BLOCKED Policy Engine audit event"
+        audit = policy_audits[0]
         assert audit.decision == "BLOCKED"
         assert audit.reason == "POLICY_COOLDOWN_ACTIVE"

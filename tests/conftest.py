@@ -17,11 +17,10 @@ from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock
 
 import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from main import app
 from dependencies.db import get_db
+from httpx import ASGITransport, AsyncClient
+from main import app
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def _mock_db() -> AsyncGenerator[AsyncSession, None]:

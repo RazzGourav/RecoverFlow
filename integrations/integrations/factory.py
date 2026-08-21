@@ -7,6 +7,7 @@ Why this file exists:
 """
 
 from config import settings
+
 from integrations.base import PaymentProvider
 
 

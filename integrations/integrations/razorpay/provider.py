@@ -10,8 +10,8 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 import razorpay
-
 from config import settings
+
 from integrations.base import PaymentProvider
 
 

@@ -9,15 +9,17 @@ Why this exists:
 """
 
 import json
+
+# Imports using absolute path from root
+import sys
 from pathlib import Path
+
 import joblib
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import precision_recall_fscore_support
 from xgboost import XGBClassifier
 
-# Imports using absolute path from root
-import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from ai.features.engineer import build_features

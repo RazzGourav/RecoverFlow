@@ -8,15 +8,14 @@ import uuid
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select
-
 from config import settings
-from db.models import PaymentEvent, RecoveryCase, FailureType
-from workers.event_worker.worker import normalize_payment_event
+from db.models import FailureType, PaymentEvent, RecoveryCase
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
 
+from workers.event_worker.worker import normalize_payment_event
 
 # Setup a dedicated test database engine (assumes postgres is running locally on 5432)
 # We will use the main DB but we can rollback or clean up after.
@@ -42,8 +41,8 @@ async def setup_database():
 
 @pytest.fixture
 def test_app(db_engine_and_session):
-    from main import app
     from dependencies.db import get_db
+    from main import app
     _, TestingSessionLocal = db_engine_and_session
 
     async def override_get_db():

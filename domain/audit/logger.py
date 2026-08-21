@@ -8,10 +8,12 @@ Why this exists:
 """
 
 import uuid
-from typing import Dict, Any
+from typing import Any
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.db.models import AuditEvent, AuditEventType
+
 
 async def log_decision(
     session: AsyncSession,
@@ -21,7 +23,7 @@ async def log_decision(
     reason: str,
     model_version: str,
     policy_version: str,
-    context: Dict[str, Any],
+    context: dict[str, Any],
     event_type: AuditEventType | None = None
 ) -> AuditEvent:
     """

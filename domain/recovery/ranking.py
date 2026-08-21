@@ -7,8 +7,9 @@ Why this exists:
   This ensures we always attempt the most profitable recovery path first.
 """
 
-from typing import List, Dict
+
 from pydantic import BaseModel
+
 
 class RankedAction(BaseModel):
     action_type: str
@@ -18,8 +19,8 @@ class RankedAction(BaseModel):
 
 
 def rank_candidate_actions(
-    amount_paise: int, action_probabilities: Dict[str, float]
-) -> List[RankedAction]:
+    amount_paise: int, action_probabilities: dict[str, float]
+) -> list[RankedAction]:
     """
     Ranks actions strictly by Expected Value (Amount * P(Success)).
     
