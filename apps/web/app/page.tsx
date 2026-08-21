@@ -69,6 +69,9 @@ export default async function RevenueControlTower() {
             <Link href="/cases" className="text-sm font-medium text-brand-300 hover:text-brand-200 bg-brand-900/30 border border-brand-500/20 px-4 py-2 rounded-lg backdrop-blur-md transition-colors">
               View All Cases
             </Link>
+            <Link href="/simulation" className="text-sm font-medium text-[#d946ef] hover:text-[#f0abfc] bg-[#d946ef]/10 border border-[#d946ef]/30 px-4 py-2 rounded-lg backdrop-blur-md transition-colors">
+              Simulation Lab
+            </Link>
             <Link href="/policies" className="text-sm font-medium text-white hover:text-brand-100 bg-[#06b6d4]/20 border border-[#06b6d4]/40 px-4 py-2 rounded-lg backdrop-blur-md transition-colors">
               Policy Studio
             </Link>

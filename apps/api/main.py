@@ -153,6 +153,8 @@ def create_app() -> FastAPI:
     app.include_router(audit_router, prefix="/audit", tags=["audit"])
     from routes.dashboard import router as dashboard_router
     app.include_router(dashboard_router, prefix="/dashboard", tags=["dashboard"])
+    from routes.simulation import router as simulation_router
+    app.include_router(simulation_router, tags=["simulation"])
 
     return app
 

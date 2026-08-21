@@ -51,7 +51,7 @@ def build_case_context(case: RecoveryCase) -> dict[str, Any]:
     }
 
 
-async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase) -> None:
+async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase, force_action: ActionType | None = None) -> None:
     """
     Executes the decision logic for a RecoveryCase.
     """
@@ -151,7 +151,10 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase) -> No
     }
     
     # 5. Evaluate strict Policy Rules against the top-ranked action
-    best_candidate = ranked_actions[0]
+    if force_action:
+        best_candidate = next((c for c in ranked_actions if c.action_type == force_action.value), ranked_actions[0])
+    else:
+        best_candidate = ranked_actions[0]
     
     status, reason = evaluate_action(
         action_type=best_candidate.action_type,
