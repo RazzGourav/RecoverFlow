@@ -113,6 +113,10 @@ async def normalize_payment_event(ctx: dict, payment_event_id: str) -> None:
             event.recovery_case_id = case.id
             event.status = PaymentEventStatus.PROCESSED
             
+            # PHASE 4: Run Decision Pipeline
+            from domain.policies.pipeline import run_decision_pipeline
+            await run_decision_pipeline(session, case)
+            
             await session.commit()
             logger.info("worker.normalize_event.success", payment_event_id=payment_event_id, case_id=str(case.id))
 

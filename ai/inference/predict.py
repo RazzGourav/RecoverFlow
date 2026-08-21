@@ -29,7 +29,7 @@ ACTION_TYPES = [
     "NO_ACTION",
 ]
 
-ARTIFACTS_DIR = Path(__file__).resolve().parents[2] / "artifacts"
+ARTIFACTS_DIR = Path(__file__).resolve().parents[1] / "artifacts"
 MODEL_VERSION = "1.0.0"
 
 _recovery_model = None
