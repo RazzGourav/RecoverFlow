@@ -12,8 +12,59 @@ from apps.api.db.models import (
     CaseStatus,
     AuthorizationStatus,
     FailureType,
-    RiskLevel
+    RiskLevel,
+    Merchant,
+    Customer,
+    Subscription,
+    Policy,
+    Action,
+    AuditEvent
 )
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+import pytest_asyncio
+
+TEST_DATABASE_URL = "postgresql+asyncpg://recoverflow:recoverflow@postgres:5432/recoverflow"
+
+@pytest_asyncio.fixture
+async def db_engine_and_session():
+    test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    TestingSessionLocal = sessionmaker(
+        bind=test_engine, class_=AsyncSession, expire_on_commit=False
+    )
+    yield test_engine, TestingSessionLocal
+    await test_engine.dispose()
+
+async def setup_test_data(db_session: AsyncSession):
+    merchant = Merchant(name="LLM Test Merchant")
+    db_session.add(merchant)
+    await db_session.flush()
+    
+    customer = Customer(merchant_id=merchant.id, external_customer_id="cust_123")
+    db_session.add(customer)
+    await db_session.flush()
+    
+    subscription = Subscription(
+        customer_id=customer.id, 
+        plan_id="plan_123", 
+        amount_paise=1000,
+        cycle=1
+    )
+    db_session.add(subscription)
+    
+    policy = Policy(
+        merchant_id=merchant.id, 
+        max_autonomous_amount_paise=500000, 
+        retry_limit=3, 
+        cooldown_hours=24,
+        confidence_threshold=0.0
+    )
+    db_session.add(policy)
+    
+    await db_session.commit()
+    
+    return merchant, customer, subscription
 
 @pytest.mark.asyncio
 async def test_generate_explanation_timeout_raises_error():
@@ -22,7 +73,8 @@ async def test_generate_explanation_timeout_raises_error():
         await asyncio.sleep(2.0)
         return ExplanationResult(narrative="Test", reason_codes=["TEST"])
     
-    with patch("ai.inference.llm._call_llms", side_effect=slow_mock):
+    with patch("ai.inference.llm._call_llms", side_effect=slow_mock), \
+         patch("apps.api.config.settings.llm_provider", "openai"):
         with pytest.raises(LLMExplanationError) as exc:
             await generate_explanation(
                 amount_paise=1000,
@@ -42,7 +94,8 @@ async def test_llm_schema_validation_failure():
     async def bad_json_mock(*args, **kwargs):
         raise ValueError("Invalid JSON")
     
-    with patch("ai.inference.llm._call_llms", side_effect=bad_json_mock):
+    with patch("ai.inference.llm._call_llms", side_effect=bad_json_mock), \
+         patch("apps.api.config.settings.llm_provider", "openai"):
         with pytest.raises(LLMExplanationError) as exc:
             await generate_explanation(
                 amount_paise=1000,
@@ -56,13 +109,15 @@ async def test_llm_schema_validation_failure():
         assert "failed" in str(exc.value)
 
 @pytest.mark.asyncio
-async def test_pipeline_mutation_safety(db_session, setup_test_data):
+async def test_pipeline_mutation_safety(db_engine_and_session):
     """
     CRITICAL: Ensure the LLM layer cannot mutate core decision fields.
     Even if the LLM hallucinates an instruction to approve a blocked action,
     it must ONLY affect the explanation field.
     """
-    merchant, customer, subscription = setup_test_data
+    engine, SessionLocal = db_engine_and_session
+    async with SessionLocal() as db_session:
+        merchant, customer, subscription = await setup_test_data(db_session)
     
     case = RecoveryCase(
         merchant_id=merchant.id,
@@ -93,7 +148,7 @@ async def test_pipeline_mutation_safety(db_session, setup_test_data):
         reason_codes=["APPROVED_BY_AI"]
     )
     
-    with patch("domain.policies.pipeline.generate_explanation", new_callable=AsyncMock) as mock_llm:
+    with patch("ai.inference.llm.generate_explanation", new_callable=AsyncMock) as mock_llm:
         mock_llm.return_value = mock_explanation
         
         await run_decision_pipeline(db_session, case)
@@ -107,15 +162,17 @@ async def test_pipeline_mutation_safety(db_session, setup_test_data):
         # BUT the status remains deterministic (AWAITING_APPROVAL because of amount)
         assert case.status == CaseStatus.AWAITING_APPROVAL
         
-        # And the Action is correctly flagged as AWAITING_HUMAN
-        actions = await case.awaitable_attrs.actions
+        actions_res = await db_session.execute(select(Action).where(Action.case_id == case.id))
+        actions = actions_res.scalars().all()
         assert len(actions) == 1
         assert actions[0].authorization_status == AuthorizationStatus.AWAITING_HUMAN
 
 @pytest.mark.asyncio
-async def test_pipeline_fallback_on_timeout(db_session, setup_test_data):
+async def test_pipeline_fallback_on_timeout(db_engine_and_session):
     """Test that a slow LLM doesn't block the pipeline; it falls back."""
-    merchant, customer, subscription = setup_test_data
+    engine, SessionLocal = db_engine_and_session
+    async with SessionLocal() as db_session:
+        merchant, customer, subscription = await setup_test_data(db_session)
     
     case = RecoveryCase(
         merchant_id=merchant.id,
@@ -140,7 +197,7 @@ async def test_pipeline_fallback_on_timeout(db_session, setup_test_data):
     await db_session.commit()
     
     # Mock generate_explanation to raise LLMExplanationError (simulating timeout inside)
-    with patch("domain.policies.pipeline.generate_explanation", side_effect=LLMExplanationError("Timeout!")):
+    with patch("ai.inference.llm.generate_explanation", side_effect=LLMExplanationError("Timeout!")):
         await run_decision_pipeline(db_session, case)
         
         await db_session.refresh(case)
@@ -150,11 +207,13 @@ async def test_pipeline_fallback_on_timeout(db_session, setup_test_data):
         assert case.status == CaseStatus.ACTION_INITIATED
         
         # The Action should still be created
-        actions = await case.awaitable_attrs.actions
+        actions_res = await db_session.execute(select(Action).where(Action.case_id == case.id))
+        actions = actions_res.scalars().all()
         assert len(actions) == 1
         assert actions[0].authorization_status == AuthorizationStatus.AUTONOMOUS
         
-        # An audit event should be logged for the LLM failure
-        audit_events = await case.awaitable_attrs.audit_events
+        # An audit event should be logged
+        audit_res = await db_session.execute(select(AuditEvent).where(AuditEvent.case_id == case.id))
+        audit_events = audit_res.scalars().all()
         failure_events = [e for e in audit_events if e.reason.startswith("LLM_TIMEOUT_OR_FAILURE")]
         assert len(failure_events) == 1

@@ -21,7 +21,8 @@ async def log_decision(
     reason: str,
     model_version: str,
     policy_version: str,
-    context: Dict[str, Any]
+    context: Dict[str, Any],
+    event_type: AuditEventType | None = None
 ) -> AuditEvent:
     """
     Creates and persists an immutable audit log entry for a policy decision.
@@ -35,19 +36,21 @@ async def log_decision(
         model_version: Version of the AI model that proposed the action.
         policy_version: Version of the Policy that evaluated it.
         context: Additional structured data (e.g. amounts, probabilities).
+        event_type: Override the automatically inferred AuditEventType.
         
     Returns:
         The created AuditEvent object.
     """
     
-    # Map decision to AuditEventType
-    event_type = AuditEventType.POLICY_EVALUATED
-    if decision == "AUTONOMOUS":
-        event_type = AuditEventType.ACTION_AUTHORIZED
-    elif decision == "BLOCKED":
-        event_type = AuditEventType.ACTION_BLOCKED
-    elif decision == "AWAITING_HUMAN":
-        event_type = AuditEventType.HUMAN_ESCALATION
+    # Map decision to AuditEventType if not provided
+    if event_type is None:
+        event_type = AuditEventType.POLICY_EVALUATED
+        if decision == "AUTONOMOUS":
+            event_type = AuditEventType.ACTION_AUTHORIZED
+        elif decision == "BLOCKED":
+            event_type = AuditEventType.ACTION_BLOCKED
+        elif decision == "AWAITING_HUMAN":
+            event_type = AuditEventType.HUMAN_ESCALATION
 
     audit_event = AuditEvent(
         case_id=uuid.UUID(case_id),

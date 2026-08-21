@@ -21,12 +21,16 @@ from workers.event_worker.worker import normalize_payment_event
 # Setup a dedicated test database engine (assumes postgres is running locally on 5432)
 # We will use the main DB but we can rollback or clean up after.
 # Alternatively, since it's an integration test, we insert data, run worker, verify.
-TEST_DATABASE_URL = "postgresql+asyncpg://recoverflow:recoverflow@localhost:5432/recoverflow"
-test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-TestingSessionLocal = sessionmaker(
-    bind=test_engine, class_=AsyncSession, expire_on_commit=False
-)
+TEST_DATABASE_URL = "postgresql+asyncpg://recoverflow:recoverflow@postgres:5432/recoverflow"
 
+@pytest_asyncio.fixture
+async def db_engine_and_session():
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    TestingSessionLocal = sessionmaker(
+        bind=engine, class_=AsyncSession, expire_on_commit=False
+    )
+    yield engine, TestingSessionLocal
+    await engine.dispose()
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_database():
@@ -37,9 +41,10 @@ async def setup_database():
 
 
 @pytest.fixture
-def test_app():
+def test_app(db_engine_and_session):
     from main import app
     from dependencies.db import get_db
+    _, TestingSessionLocal = db_engine_and_session
 
     async def override_get_db():
         async with TestingSessionLocal() as session:
@@ -60,7 +65,7 @@ async def integration_client(test_app) -> AsyncClient:
 
 
 @pytest.mark.asyncio
-async def test_full_webhook_flow_creates_recovery_case(integration_client: AsyncClient) -> None:
+async def test_full_webhook_flow_creates_recovery_case(integration_client: AsyncClient, db_engine_and_session) -> None:
     """
     Integration test:
     1. Send realistic webhook via API (bypassing signature via REPLACE_ME).
@@ -68,6 +73,8 @@ async def test_full_webhook_flow_creates_recovery_case(integration_client: Async
     3. Run event normalizer synchronously on that event.
     4. Verify RecoveryCase is created with correct FailureType.
     """
+    _, TestingSessionLocal = db_engine_and_session
+    
     settings.razorpay_webhook_secret = "REPLACE_ME"
     
     event_id = f"ev_int_{uuid.uuid4().hex[:8]}"

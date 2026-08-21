@@ -22,18 +22,22 @@ from apps.api.db.models import (
 )
 from domain.policies.pipeline import run_decision_pipeline
 
-TEST_DATABASE_URL = "postgresql+asyncpg://recoverflow:recoverflow@localhost:5432/recoverflow"
+import pytest_asyncio
 
-async def get_test_session():
+TEST_DATABASE_URL = "postgresql+asyncpg://recoverflow:recoverflow@postgres:5432/recoverflow"
+
+@pytest_asyncio.fixture
+async def db_engine_and_session():
     test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     TestingSessionLocal = sessionmaker(
         bind=test_engine, class_=AsyncSession, expire_on_commit=False
     )
-    return test_engine, TestingSessionLocal
+    yield test_engine, TestingSessionLocal
+    await test_engine.dispose()
 
 @pytest.mark.asyncio
-async def test_decision_pipeline_creates_audit_event_and_action():
-    engine, Session = await get_test_session()
+async def test_decision_pipeline_creates_audit_event_and_action(db_engine_and_session):
+    engine, Session = db_engine_and_session
     async with Session() as db_session:
         merchant = Merchant(name="Test Merchant")
         db_session.add(merchant)
@@ -80,12 +84,11 @@ async def test_decision_pipeline_creates_audit_event_and_action():
         assert audit.model_version is not None
         assert audit.decision in ["AUTONOMOUS", "AWAITING_HUMAN", "BLOCKED"]
         assert audit.context["action_type"] == action.action_type.value
-    await engine.dispose()
 
 
 @pytest.mark.asyncio
-async def test_decision_pipeline_blocks_repeated_action():
-    engine, Session = await get_test_session()
+async def test_decision_pipeline_blocks_repeated_action(db_engine_and_session):
+    engine, Session = db_engine_and_session
     async with Session() as db_session:
         merchant = Merchant(name="Test Merchant 2")
         db_session.add(merchant)
@@ -132,4 +135,3 @@ async def test_decision_pipeline_blocks_repeated_action():
         audit = audit_res.scalars().first()
         assert audit.decision == "BLOCKED"
         assert audit.reason == "POLICY_COOLDOWN_ACTIVE"
-    await engine.dispose()
