@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import structlog
 from arq.connections import RedisSettings
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from config import settings
@@ -112,6 +111,10 @@ async def normalize_payment_event(ctx: dict, payment_event_id: str) -> None:
             await session.flush()  # to get case.id
             event.recovery_case_id = case.id
             event.status = PaymentEventStatus.PROCESSED
+            
+            # PHASE 4: Run Decision Pipeline
+            from domain.policies.pipeline import run_decision_pipeline
+            await run_decision_pipeline(session, case)
             
             await session.commit()
             logger.info("worker.normalize_event.success", payment_event_id=payment_event_id, case_id=str(case.id))

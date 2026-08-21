@@ -6,12 +6,11 @@ and produces structurally sound distributions.
 """
 
 import csv
-import json
 import filecmp
 from pathlib import Path
 from unittest.mock import patch
 
-from data.synthetic.generate import main, SEED
+from data.synthetic.generate import main
 
 def test_reproducibility(tmp_path: Path) -> None:
     """

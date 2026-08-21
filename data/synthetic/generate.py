@@ -22,10 +22,8 @@ Acceptance Criteria implemented here:
 
 import csv
 import json
-import os
 import random
 import uuid
-from collections import defaultdict
 from pathlib import Path
 
 # The deterministic anchor.

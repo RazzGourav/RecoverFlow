@@ -64,18 +64,6 @@ class Settings(BaseSettings):
     next_public_api_url: str = "http://localhost:8000"
     internal_api_url: str = "http://api:8000"
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def _parse_cors(cls, v: str | list[str]) -> list[str]:
-        """Parse CORS origins from a comma-separated string or list.
-
-        Why: docker-compose passes env vars as plain strings; Pydantic needs
-        to accept both representations to stay 12-factor compliant.
-        """
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
-
 
 # Module-level singleton — imported everywhere as `from config import settings`.
 settings = Settings()

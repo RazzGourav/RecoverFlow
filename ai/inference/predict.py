@@ -7,7 +7,6 @@ Why this exists:
   `AIDecisionContract`. This isolates all ML complexity from the API and Workers.
 """
 
-import json
 from pathlib import Path
 from typing import Dict, Any
 
@@ -29,7 +28,7 @@ ACTION_TYPES = [
     "NO_ACTION",
 ]
 
-ARTIFACTS_DIR = Path(__file__).resolve().parents[2] / "artifacts"
+ARTIFACTS_DIR = Path(__file__).resolve().parents[1] / "artifacts"
 MODEL_VERSION = "1.0.0"
 
 _recovery_model = None

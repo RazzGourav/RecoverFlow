@@ -11,9 +11,6 @@ Why this file exists:
 
 import asyncio
 import csv
-import json
-import os
-import random
 from pathlib import Path
 
 from sqlalchemy import delete
@@ -27,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "api"))
 from config import settings
 from db.models import (
     Merchant, Customer, Subscription, PaymentEvent, RecoveryCase, CandidateAction,
-    CustomerSegment, FailureType, PaymentEventStatus, ActionType, Base
+    CustomerSegment, FailureType, PaymentEventStatus, ActionType
 )
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"

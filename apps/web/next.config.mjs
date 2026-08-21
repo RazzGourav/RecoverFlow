@@ -1,13 +1,5 @@
-import type { NextConfig } from "next";
-
-/**
- * RecoverFlow Next.js configuration.
- *
- * Why: Centralises Next.js settings so environment-specific behaviour
- * (API URL rewrites, image domains, etc.) is managed in one place
- * rather than scattered across components.
- */
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   // Strict mode catches common React mistakes in development.
   reactStrictMode: true,
 
