@@ -476,6 +476,8 @@ class CandidateAction(Base):
     success_probability: Mapped[float] = mapped_column(Float, nullable=False)
     # Expected value = amount x success_probability (in paise)
     expected_value_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    # The estimated execution cost of this specific action (in paise)
+    action_cost_paise: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     risk_level: Mapped[RiskLevel] = mapped_column(
         Enum(RiskLevel), nullable=False, default=RiskLevel.LOW
     )
@@ -579,6 +581,8 @@ class Policy(Base):
     human_review_threshold_paise: Mapped[int] = mapped_column(
         BigInteger, nullable=False, default=2_500_000  # ₹25,000
     )
+    # Portfolio-level budget limit for recovery actions (in paise)
+    max_recovery_spend_paise: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     # Max customer-facing contacts per 72-hour window
     max_contacts_per_72h: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
     # Policy version label for auditability

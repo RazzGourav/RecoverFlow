@@ -224,8 +224,9 @@ make smoke       # Run smoke tests
 | 6 | Risk Firewall | ✅ Complete | PRD Module D: defense-only safety layer with five risk checks |
 | 7 | Action Layer | ✅ Done | |
 | 7.5 | Validation Layer | ✅ Done | |
-| 8 | Finance Truth Layer | 🏃 Next | |
-| 9 | Dashboard | 🔲 Upcoming | |
+| 8 | Finance Truth Layer | ✅ Done | |
+| 8.5 | Budget Optimizer | ✅ Done | |
+| 9 | Dashboard | 🏃 Next | |
 | 10 | Simulation Lab | 🔲 Upcoming | |
 | 11 | Failure Center | 🔲 Upcoming | |
 | 12 | Product Polish | 🔲 Upcoming | |
