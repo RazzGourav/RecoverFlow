@@ -472,7 +472,7 @@ class CandidateAction(Base):
     )
     # P(success | case, this action)
     success_probability: Mapped[float] = mapped_column(Float, nullable=False)
-    # Expected value = amount × success_probability (in paise)
+    # Expected value = amount x success_probability (in paise)
     expected_value_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
     risk_level: Mapped[RiskLevel] = mapped_column(
         Enum(RiskLevel), nullable=False, default=RiskLevel.LOW
@@ -569,7 +569,7 @@ class Policy(Base):
     retry_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
     # Minimum hours between interventions for the same case
     cooldown_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=12)
-    # Minimum model confidence required for autonomous action (0.0–1.0)
+    # Minimum model confidence required for autonomous action (0.0-1.0)
     confidence_threshold: Mapped[float] = mapped_column(
         Float, nullable=False, default=0.80
     )

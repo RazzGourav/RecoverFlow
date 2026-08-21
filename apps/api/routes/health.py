@@ -12,7 +12,7 @@ Why this file exists:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
 import structlog
 from fastapi import APIRouter, Depends, status
@@ -32,7 +32,7 @@ router = APIRouter(tags=["health"])
     description="Returns 200 when the API is running and Postgres is reachable.",
     status_code=status.HTTP_200_OK,
 )
-async def health(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+async def health(db: Annotated[AsyncSession, Depends(get_db)]) -> dict[str, Any]:
     """
     Perform a liveness + readiness check.
 
