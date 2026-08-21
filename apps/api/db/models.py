@@ -136,6 +136,7 @@ class ExecutionStatus(str, enum.Enum):
     CANCELLED = "CANCELLED"
     TIMED_OUT = "TIMED_OUT"
     EXCEPTION = "EXCEPTION"
+    VALIDATION_BLOCKED = "VALIDATION_BLOCKED"
 
 
 class RiskLevel(str, enum.Enum):
