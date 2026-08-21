@@ -139,6 +139,8 @@ def create_app() -> FastAPI:
     app.include_router(webhooks_router)
     from routes.cases import router as cases_router
     app.include_router(cases_router, prefix="/cases", tags=["cases"])
+    from routes.metrics import router as metrics_router
+    app.include_router(metrics_router, prefix="/metrics", tags=["metrics"])
 
     return app
 

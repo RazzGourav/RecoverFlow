@@ -173,6 +173,7 @@ class ReconciliationStatus(str, enum.Enum):
     """Status of a financial reconciliation record."""
 
     MATCHED = "MATCHED"
+    PARTIAL = "PARTIAL"
     EXCEPTION = "EXCEPTION"
     PENDING = "PENDING"
 
