@@ -7,32 +7,37 @@ Why this exists:
   ranks candidates, evaluates policies, and saves the final Action and AuditEvent.
 """
 
-from typing import Any, Dict
 from datetime import datetime, timezone
+from typing import Any
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 
-from apps.api.db.models import (
-    RecoveryCase, 
-    Policy, 
-    Action, 
-    CandidateAction, 
-    ActionType,
-    CaseStatus,
-    AuthorizationStatus,
-    ExecutionStatus,
-    RiskLevel,
-    AuditEventType
-)
-from ai.inference.predict import analyze_case
 from ai.features.engineer import ACTION_TYPES
-from domain.recovery.ranking import rank_candidate_actions
-from domain.policies.engine import evaluate_action, OUTCOME_AUTONOMOUS, OUTCOME_BLOCKED
+from ai.inference.predict import analyze_case
+from apps.api.db.models import (
+    Action,
+    ActionType,
+    AuditEventType,
+    AuthorizationStatus,
+    CandidateAction,
+    CaseStatus,
+    ExecutionStatus,
+    Policy,
+    RecoveryCase,
+    RiskLevel,
+)
 from domain.audit.logger import log_decision
+from domain.policies.engine import OUTCOME_AUTONOMOUS, OUTCOME_BLOCKED, evaluate_action
+from domain.recovery.ranking import rank_candidate_actions
+from domain.risk.firewall import (
+    RiskOutcome,
+    compose_with_policy_decision,
+    evaluate_risk_firewall,
+)
 
 
-def build_case_context(case: RecoveryCase) -> Dict[str, Any]:
+def build_case_context(case: RecoveryCase) -> dict[str, Any]:
     """Helper to map a RecoveryCase to the raw dictionary expected by ML."""
     # In a fully fleshed out system, we would join with Customer and Subscription here.
     return {
@@ -84,9 +89,10 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase) -> No
     # For Phase 4, we will re-calculate expected values manually using the ML model.
     # Note: AI inference functions are synchronous because they use Scikit-Learn/XGBoost.
     
-    from ai.inference import predict
-    from ai.features.engineer import build_features
     import pandas as pd
+
+    from ai.features.engineer import build_features
+    from ai.inference import predict
     
     predict.load_models()
     decision_contract = analyze_case(case_context)
@@ -156,6 +162,69 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase) -> No
         current_time=datetime.now(timezone.utc)
     )
     
+    # 5b. Risk Firewall (PRD Module D) — defense-only layer
+    # Runs AFTER Policy Engine to compose (not replace) its decision.
+    # Firewall can only make the result MORE restrictive, never less.
+    firewall_result = evaluate_risk_firewall(
+        # Check 1 — Transaction risk
+        is_duplicate=False,  # Handled at webhook ingestion layer; here assume clean
+        is_stale=False,
+        failure_type=case.failure_type.value if hasattr(case.failure_type, "value") else str(case.failure_type),
+        past_failed_attempts=history_context["past_actions_count"],
+        # Check 2 — Frequency risk
+        contacts_in_last_72h=history_context.get("contacts_in_last_72h", 0),
+        actions_in_last_24h=history_context["past_actions_count"],
+        # Check 3 — Amount risk
+        amount_paise=case.amount_paise,
+        autonomous_threshold_paise=policy_config.get("max_autonomous_amount_paise", 500_000),
+        review_threshold_paise=policy_config.get("human_review_threshold_paise", 2_500_000),
+        # Check 4 — Behavioral anomaly
+        tenure_days=0,           # Populated from Customer in a future phase
+        typical_amount_paise=case.amount_paise,   # No historical data yet; use current
+        segment="UNKNOWN",
+        # Check 5 — Policy violation
+        action_type=best_candidate.action_type,
+        allowed_action_types=[a.value for a in ActionType],  # Merchant's full allowlist
+        merchant_is_active=True,
+        action_requires_human_approval=(status != OUTCOME_AUTONOMOUS),
+        current_authorization_status=status,
+    )
+    
+    # Compose: take the stricter of policy engine + risk firewall outcomes
+    composed_status = compose_with_policy_decision(firewall_result.outcome, status)
+    
+    # Log the Risk Firewall audit event (distinct reason code "RISK_*")
+    rf_event_type = (
+        AuditEventType.RISK_FIREWALL_BLOCKED
+        if firewall_result.outcome == RiskOutcome.BLOCK
+        else AuditEventType.RISK_FIREWALL_EVALUATED
+    )
+    await log_decision(
+        session=session,
+        case_id=str(case.id),
+        action_type=best_candidate.action_type,
+        decision=firewall_result.outcome.value,
+        reason=firewall_result.primary_reason,
+        model_version=decision_contract.model_version,
+        policy_version=policy.version,
+        event_type=rf_event_type,
+        context={
+            "firewall_score": firewall_result.overall_score,
+            "triggered_reasons": firewall_result.triggered_reasons,
+        },
+    )
+    
+    # Use composed_status for the final action authorization.
+    # Reason attribution:
+    #   - If the firewall produced BLOCK, the firewall is the deciding factor → use firewall reason.
+    #   - If the firewall produced REVIEW or ALLOW, the policy engine's reason is still authoritative
+    #     because the firewall only added a constraint on top; the original policy decision text
+    #     (e.g. POLICY_COOLDOWN_ACTIVE) is what tells the human reviewer WHY the case was blocked.
+    status = composed_status
+    if firewall_result.outcome == RiskOutcome.BLOCK:
+        reason = firewall_result.primary_reason
+    # else: keep the original policy engine reason
+
     # Map rule engine outcome to AuthorizationStatus
     auth_status = AuthorizationStatus.AWAITING_HUMAN
     if status == OUTCOME_AUTONOMOUS:
@@ -186,7 +255,7 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase) -> No
         
     # 7. LLM Reasoning Layer (Phase 5)
     # This executes strictly AFTER the deterministic policy engine has set the action status.
-    from ai.inference.llm import generate_explanation, LLMExplanationError
+    from ai.inference.llm import LLMExplanationError, generate_explanation
     
     llm_context = {}
     try:
@@ -209,7 +278,7 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase) -> No
             case_id=str(case.id),
             action_type=best_candidate.action_type,
             decision=status,
-            reason=f"LLM_TIMEOUT_OR_FAILURE: {str(e)}",
+            reason=f"LLM_TIMEOUT_OR_FAILURE: {e!s}",
             model_version=decision_contract.model_version,
             policy_version=policy.version,
             event_type=AuditEventType.LLM_EXPLANATION_FAILED,

@@ -9,15 +9,15 @@ Why this exists:
 from datetime import datetime, timedelta, timezone
 
 from domain.policies.rules import (
+    OUTCOME_AUTONOMOUS,
+    OUTCOME_BLOCKED,
+    OUTCOME_HUMAN,
     check_autonomous_amount_limit,
-    check_human_review_threshold,
     check_confidence_threshold,
-    check_retry_limit,
     check_cooldown_period,
     check_frequency_cap,
-    OUTCOME_AUTONOMOUS,
-    OUTCOME_HUMAN,
-    OUTCOME_BLOCKED
+    check_human_review_threshold,
+    check_retry_limit,
 )
 
 

@@ -11,20 +11,29 @@ Why this file exists:
 
 import asyncio
 import csv
-from pathlib import Path
-
-from sqlalchemy import delete
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
 
 # Setup path so we can import from apps.api
 import sys
+from pathlib import Path
+
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "api"))
 
 from config import settings
 from db.models import (
-    Merchant, Customer, Subscription, PaymentEvent, RecoveryCase, CandidateAction,
-    CustomerSegment, FailureType, PaymentEventStatus, ActionType
+    ActionType,
+    CandidateAction,
+    Customer,
+    CustomerSegment,
+    FailureType,
+    Merchant,
+    PaymentEvent,
+    PaymentEventStatus,
+    RecoveryCase,
+    Subscription,
 )
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"

@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+
 class ExplanationResult(BaseModel):
     narrative: str = Field(
         description="A human-readable explanation of what happened, why the action was selected, and any alternatives considered. Max 500 characters."

@@ -9,7 +9,6 @@ Why this file exists:
 
 from __future__ import annotations
 
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 

@@ -1,29 +1,30 @@
 import asyncio
-import pytest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import AsyncMock, patch
 
-from ai.inference.llm import generate_explanation, LLMExplanationError
-from domain.policies.pipeline import run_decision_pipeline
-from ai.prompts.reasoning import ExplanationResult
-from apps.api.db.models import (
-    RecoveryCase,
-    CandidateAction,
-    ActionType,
-    CaseStatus,
-    AuthorizationStatus,
-    FailureType,
-    RiskLevel,
-    Merchant,
-    Customer,
-    Subscription,
-    Policy,
-    Action,
-    AuditEvent
-)
+import pytest
+import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-import pytest_asyncio
+
+from ai.inference.llm import LLMExplanationError, generate_explanation
+from ai.prompts.reasoning import ExplanationResult
+from apps.api.db.models import (
+    Action,
+    ActionType,
+    AuditEvent,
+    AuthorizationStatus,
+    CandidateAction,
+    CaseStatus,
+    Customer,
+    FailureType,
+    Merchant,
+    Policy,
+    RecoveryCase,
+    RiskLevel,
+    Subscription,
+)
+from domain.policies.pipeline import run_decision_pipeline
 
 TEST_DATABASE_URL = "postgresql+asyncpg://recoverflow:recoverflow@postgres:5432/recoverflow"
 
@@ -123,7 +124,10 @@ async def test_pipeline_mutation_safety(db_engine_and_session):
         merchant_id=merchant.id,
         customer_id=customer.id,
         subscription_id=subscription.id,
-        amount_paise=10_000_000, # 1 Lakh (requires human review)
+        # Use ₹30,000 (3_000_000 paise) — above review threshold (₹25k) but below
+        # hard-block threshold (₹1,00,000). This triggers AWAITING_HUMAN from the
+        # policy engine + REVIEW from the firewall → composed = AWAITING_HUMAN.
+        amount_paise=3_000_000,
         failure_type=FailureType.TEMPORARY,
         status=CaseStatus.OPEN
     )
@@ -134,7 +138,7 @@ async def test_pipeline_mutation_safety(db_engine_and_session):
         case_id=case.id,
         action_type=ActionType.RETRY,
         success_probability=0.9,
-        expected_value_paise=9_000_000,
+        expected_value_paise=2_700_000,
         risk_level=RiskLevel.LOW,
         rank=1
     )
@@ -212,7 +216,8 @@ async def test_pipeline_fallback_on_timeout(db_engine_and_session):
         assert len(actions) == 1
         assert actions[0].authorization_status == AuthorizationStatus.AUTONOMOUS
         
-        # An audit event should be logged
+        # An LLM failure audit event should be logged
+        # Phase 6: there are now multiple audit events (firewall + policy + LLM failure)
         audit_res = await db_session.execute(select(AuditEvent).where(AuditEvent.case_id == case.id))
         audit_events = audit_res.scalars().all()
         failure_events = [e for e in audit_events if e.reason.startswith("LLM_TIMEOUT_OR_FAILURE")]

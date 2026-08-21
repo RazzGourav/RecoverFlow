@@ -7,9 +7,10 @@ Why this exists:
   risk as LOW, MEDIUM, or HIGH, satisfying PRD Module D requirements.
 """
 
-from typing import Dict, Any
+from typing import Any
 
-def score_risk(case_data: Dict[str, Any]) -> tuple[str, list[str]]:
+
+def score_risk(case_data: dict[str, Any]) -> tuple[str, list[str]]:
     """
     Evaluates a case and returns the RiskLevel and reason codes.
     

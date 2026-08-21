@@ -10,10 +10,9 @@ import json
 from unittest.mock import AsyncMock
 
 import pytest
+from config import settings
 from httpx import AsyncClient
 from sqlalchemy.exc import IntegrityError
-
-from config import settings
 
 
 def generate_signature(payload: bytes, secret: str) -> str:
@@ -117,9 +116,10 @@ async def test_idempotency_duplicate_event(client: AsyncClient, valid_payload: d
     sig = generate_signature(payload_bytes, "test_secret")
     
     # We need to mock the DB to raise IntegrityError on commit
-    from main import app
-    from dependencies.db import get_db
     from collections.abc import AsyncGenerator
+
+    from dependencies.db import get_db
+    from main import app
     from sqlalchemy.ext.asyncio import AsyncSession
     
     async def _mock_db_integrity_error() -> AsyncGenerator[AsyncSession, None]:

@@ -9,18 +9,18 @@ Why this exists:
 """
 
 from datetime import datetime
-from typing import Dict, Any, Tuple
+from typing import Any
 
 from domain.policies.rules import (
+    OUTCOME_AUTONOMOUS,
+    OUTCOME_BLOCKED,
+    OUTCOME_HUMAN,
     check_autonomous_amount_limit,
-    check_human_review_threshold,
     check_confidence_threshold,
-    check_retry_limit,
     check_cooldown_period,
     check_frequency_cap,
-    OUTCOME_AUTONOMOUS,
-    OUTCOME_HUMAN,
-    OUTCOME_BLOCKED
+    check_human_review_threshold,
+    check_retry_limit,
 )
 
 
@@ -28,10 +28,10 @@ def evaluate_action(
     action_type: str,
     confidence: float,
     amount_paise: int,
-    policy_config: Dict[str, Any],
-    case_history: Dict[str, Any],
+    policy_config: dict[str, Any],
+    case_history: dict[str, Any],
     current_time: datetime
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """
     Evaluates all rules for a given action and policy.
     

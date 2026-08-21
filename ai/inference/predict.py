@@ -8,14 +8,14 @@ Why this exists:
 """
 
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 import joblib
 import pandas as pd
 
 from ai.features.engineer import build_features
-from ai.models.risk.scorer import score_risk
 from ai.inference.contract import AIDecisionContract
+from ai.models.risk.scorer import score_risk
 
 # In real code, ACTION_TYPES could live in a shared domain enum
 ACTION_TYPES = [
@@ -51,7 +51,7 @@ def load_models():
         _intervention_model = joblib.load(int_path)
 
 
-def analyze_case(case_data: Dict[str, Any]) -> AIDecisionContract:
+def analyze_case(case_data: dict[str, Any]) -> AIDecisionContract:
     """
     Given raw case features, predicts recoverability and ranks actions.
     

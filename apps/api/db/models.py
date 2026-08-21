@@ -158,6 +158,11 @@ class AuditEventType(str, enum.Enum):
     HUMAN_ESCALATION = "HUMAN_ESCALATION"
     HUMAN_APPROVED = "HUMAN_APPROVED"
     LLM_EXPLANATION_FAILED = "LLM_EXPLANATION_FAILED"
+    # Risk Firewall events — reason codes always start with "RISK_" prefix
+    # so they are distinguishable from Policy Engine events ("POLICY_" prefix)
+    RISK_FIREWALL_EVALUATED = "RISK_FIREWALL_EVALUATED"
+    RISK_FIREWALL_BLOCKED = "RISK_FIREWALL_BLOCKED"
+
 
 
 class ReconciliationStatus(str, enum.Enum):

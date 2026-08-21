@@ -8,16 +8,17 @@ Why this exists:
 """
 
 import json
+import sys
 from pathlib import Path
+
 import joblib
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss
 
-import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from ai.features.engineer import build_features, ACTION_TYPES
+from ai.features.engineer import ACTION_TYPES, build_features
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "data" / "processed"
 ARTIFACTS_DIR = Path(__file__).resolve().parents[2] / "artifacts"

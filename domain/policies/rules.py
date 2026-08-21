@@ -9,7 +9,6 @@ Why this exists:
 """
 
 from datetime import datetime
-from typing import Tuple
 
 # Possible outcomes for a rule check.
 # The engine will select the strictest outcome: BLOCKED > AWAITING_HUMAN > AUTONOMOUS
@@ -20,7 +19,7 @@ OUTCOME_BLOCKED = "BLOCKED"
 
 def check_autonomous_amount_limit(
     amount_paise: int, max_autonomous_amount_paise: int
-) -> Tuple[str, str | None]:
+) -> tuple[str, str | None]:
     """
     If the amount exceeds the max autonomous amount, it requires human approval.
     """
@@ -31,7 +30,7 @@ def check_autonomous_amount_limit(
 
 def check_human_review_threshold(
     amount_paise: int, human_review_threshold_paise: int
-) -> Tuple[str, str | None]:
+) -> tuple[str, str | None]:
     """
     If the amount is extremely high (above human review threshold), it ALWAYS requires human approval.
     (This is often structurally similar to autonomous limit but kept separate for clear audit trails).
@@ -43,7 +42,7 @@ def check_human_review_threshold(
 
 def check_confidence_threshold(
     confidence: float, required_confidence: float
-) -> Tuple[str, str | None]:
+) -> tuple[str, str | None]:
     """
     If the AI model's confidence in the action is below the required threshold,
     a human must review the case.
@@ -55,7 +54,7 @@ def check_confidence_threshold(
 
 def check_retry_limit(
     past_actions_count: int, retry_limit: int
-) -> Tuple[str, str | None]:
+) -> tuple[str, str | None]:
     """
     If the case has already met or exceeded the retry limit, further actions are blocked.
     """
@@ -68,7 +67,7 @@ def check_cooldown_period(
     last_action_time: datetime | None,
     current_time: datetime,
     cooldown_hours: int
-) -> Tuple[str, str | None]:
+) -> tuple[str, str | None]:
     """
     If an action was taken too recently (within the cooldown window), block this action.
     """
@@ -83,7 +82,7 @@ def check_cooldown_period(
 
 def check_frequency_cap(
     contacts_in_last_72h: int, max_contacts_per_72h: int, action_type: str
-) -> Tuple[str, str | None]:
+) -> tuple[str, str | None]:
     """
     If the customer has been contacted too many times recently, block customer-facing actions.
     Non-customer-facing actions (like backend retries) are exempt from this specific cap.

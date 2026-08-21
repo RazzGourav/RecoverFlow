@@ -10,11 +10,10 @@ from __future__ import annotations
 
 import structlog
 from arq.connections import RedisSettings
-from sqlalchemy import select
-
 from config import settings
-from db.models import PaymentEvent, PaymentEventStatus, RecoveryCase, FailureType
+from db.models import FailureType, PaymentEvent, PaymentEventStatus, RecoveryCase
 from db.session import AsyncSessionLocal
+from sqlalchemy import select
 
 logger = structlog.get_logger(__name__)
 

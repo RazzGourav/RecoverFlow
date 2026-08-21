@@ -5,13 +5,15 @@ Ensures deterministic feature engineering logic and schema-validated
 inference output (AIDecisionContract).
 """
 
-import pandas as pd
-import numpy as np
 from unittest.mock import patch
+
+import numpy as np
+import pandas as pd
 
 from ai.features.engineer import build_features
 from ai.inference.contract import AIDecisionContract
 from ai.inference.predict import analyze_case
+
 
 def test_feature_engineering_deterministic():
     """Ensure raw case fields map strictly to expected numeric features."""

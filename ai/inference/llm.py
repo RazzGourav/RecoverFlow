@@ -1,11 +1,13 @@
 import asyncio
-import os
 import json
+import os
+
 from google import genai
 from google.genai import types as genai_types
 from openai import AsyncOpenAI
 
 from ai.prompts.reasoning import REASONING_PROMPT_TEMPLATE, ExplanationResult
+
 
 class LLMExplanationError(Exception):
     pass
@@ -51,7 +53,7 @@ async def generate_explanation(
     except asyncio.TimeoutError:
         raise LLMExplanationError("LLM API call timed out.")
     except Exception as e:
-        raise LLMExplanationError(f"LLM API call failed: {str(e)}")
+        raise LLMExplanationError(f"LLM API call failed: {e!s}")
 
 async def _call_llms(prompt: str) -> ExplanationResult:
     """Calls Gemini first, falls back to OpenAI."""

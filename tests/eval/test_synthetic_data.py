@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from data.synthetic.generate import main
 
+
 def test_reproducibility(tmp_path: Path) -> None:
     """
     Regenerating the dataset with the same seed produces byte-identical output.
@@ -35,7 +36,7 @@ def test_reproducibility(tmp_path: Path) -> None:
     assert set(files1.keys()) == set(files2.keys())
     assert "train.csv" in files1
     
-    for filename in files1.keys():
+    for filename in files1:
         assert filecmp.cmp(files1[filename], files2[filename], shallow=False), f"{filename} is not byte-identical!"
 
 
