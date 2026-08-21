@@ -9,8 +9,6 @@ Why this exists:
 
 from typing import Any, Dict
 from datetime import datetime, timezone
-import uuid
-import json
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -24,12 +22,13 @@ from apps.api.db.models import (
     CaseStatus,
     AuthorizationStatus,
     ExecutionStatus,
-    RiskLevel
+    RiskLevel,
+    AuditEventType
 )
 from ai.inference.predict import analyze_case
 from ai.features.engineer import ACTION_TYPES
 from domain.recovery.ranking import rank_candidate_actions
-from domain.policies.engine import evaluate_action, OUTCOME_AUTONOMOUS, OUTCOME_HUMAN, OUTCOME_BLOCKED
+from domain.policies.engine import evaluate_action, OUTCOME_AUTONOMOUS, OUTCOME_BLOCKED
 from domain.audit.logger import log_decision
 
 
@@ -185,7 +184,46 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase) -> No
     if auth_status == AuthorizationStatus.BLOCKED:
         case.status = CaseStatus.OPEN  # Or some blocked state
         
-    # 7. Audit Log
+    # 7. LLM Reasoning Layer (Phase 5)
+    # This executes strictly AFTER the deterministic policy engine has set the action status.
+    from ai.inference.llm import generate_explanation, LLMExplanationError
+    
+    llm_context = {}
+    try:
+        explanation_result = await generate_explanation(
+            amount_paise=case.amount_paise,
+            failure_type=case.failure_type.value,
+            recoverability_score=decision_contract.recoverability,
+            risk_level=decision_contract.risk_level,
+            action_type=best_candidate.action_type,
+            authorization_status=auth_status.value,
+            reason=reason
+        )
+        case.llm_explanation = explanation_result.narrative
+        llm_context["llm_reason_codes"] = explanation_result.reason_codes
+    except LLMExplanationError as e:
+        # Fallback to deterministic template so pipeline never blocks
+        case.llm_explanation = f"Action {best_candidate.action_type} evaluated to {auth_status.value} due to {reason}. (LLM Explanation unavailable)"
+        await log_decision(
+            session=session,
+            case_id=str(case.id),
+            action_type=best_candidate.action_type,
+            decision=status,
+            reason=f"LLM_TIMEOUT_OR_FAILURE: {str(e)}",
+            model_version=decision_contract.model_version,
+            policy_version=policy.version,
+            event_type=AuditEventType.LLM_EXPLANATION_FAILED,
+            context={"error": str(e)}
+        )
+        
+    # 8. Audit Log
+    context_data = {
+        "expected_value_paise": best_candidate.expected_value_paise,
+        "confidence": best_candidate.success_probability,
+        "risk_level": decision_contract.risk_level
+    }
+    context_data.update(llm_context)
+    
     await log_decision(
         session=session,
         case_id=str(case.id),
@@ -194,9 +232,5 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase) -> No
         reason=reason,
         model_version=decision_contract.model_version,
         policy_version=policy.version,
-        context={
-            "expected_value_paise": best_candidate.expected_value_paise,
-            "confidence": best_candidate.success_probability,
-            "risk_level": decision_contract.risk_level
-        }
+        context=context_data
     )

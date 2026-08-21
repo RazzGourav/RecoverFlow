@@ -5,12 +5,11 @@ Ensures deterministic feature engineering logic and schema-validated
 inference output (AIDecisionContract).
 """
 
-import pytest
 import pandas as pd
 import numpy as np
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-from ai.features.engineer import build_features, SEGMENTS, FAILURE_TYPES
+from ai.features.engineer import build_features
 from ai.inference.contract import AIDecisionContract
 from ai.inference.predict import analyze_case
 

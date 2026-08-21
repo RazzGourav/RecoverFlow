@@ -11,7 +11,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -56,8 +55,8 @@ async def razorpay_webhook(
     """
     # 1. Read raw body and validate signature (FR-002)
     raw_body = await request.body()
-    
-    # We must skip signature validation if the secret is explicitly "REPLACE_ME" 
+
+    # We must skip signature validation if the secret is explicitly "REPLACE_ME"
     # and we are running tests or local dev (without real razorpay setup).
     if settings.razorpay_webhook_secret != "REPLACE_ME":
         is_valid = verify_razorpay_signature(
@@ -86,7 +85,7 @@ async def razorpay_webhook(
     # If the payload is wrapped in a `contains` key or just top level, Razorpay sends:
     # { "event": "payment.failed", "contains": [...], "payload": { ... } }
     # Plus it sends the Razorpay-Event-Id header. Let's use the header or the payload.
-    # Actually, Razorpay sends X-Razorpay-Event-Id header. 
+    # Actually, Razorpay sends X-Razorpay-Event-Id header.
     # But usually it's also safer to grab it from headers.
     event_id = request.headers.get("X-Razorpay-Event-Id")
     if not event_id:
@@ -116,7 +115,7 @@ async def razorpay_webhook(
         status=PaymentEventStatus.RECEIVED,
     )
     db.add(event_record)
-    
+
     try:
         await db.commit()
     except IntegrityError:
@@ -124,7 +123,7 @@ async def razorpay_webhook(
         await db.rollback()
         logger.info("webhook.duplicate_ignored", external_event_id=event_id)
         return JSONResponse(status_code=status.HTTP_200_OK, content={"status": "duplicate"})
-    
+
     # 6. Enqueue normalization job to ARQ (FR-005)
     pool = getattr(request.app.state, "arq_pool", None)
     if pool:

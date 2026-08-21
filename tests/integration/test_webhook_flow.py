@@ -4,8 +4,6 @@ RecoverFlow API — Integration test for webhook ingestion and normalization.
 
 from __future__ import annotations
 
-import asyncio
-import json
 import uuid
 
 import pytest
@@ -16,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
 
 from config import settings
-from db.models import PaymentEvent, RecoveryCase, FailureType, Base
+from db.models import PaymentEvent, RecoveryCase, FailureType
 from workers.event_worker.worker import normalize_payment_event
 
 
@@ -112,7 +110,6 @@ async def test_full_webhook_flow_creates_recovery_case(integration_client: Async
         # Wait, the worker uses `AsyncSessionLocal` from db.session!
         # For integration testing, let's override `db.session.AsyncSessionLocal` 
         # or rely on the real one since it points to the same DB!
-        from db.session import AsyncSessionLocal
         # Ensure it connects to the same local DB
         
         await normalize_payment_event({}, str(event.id))

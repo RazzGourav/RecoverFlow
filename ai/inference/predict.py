@@ -7,7 +7,6 @@ Why this exists:
   `AIDecisionContract`. This isolates all ML complexity from the API and Workers.
 """
 
-import json
 from pathlib import Path
 from typing import Dict, Any
 

@@ -8,7 +8,7 @@ Why this exists:
   hard-coded safety net.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Tuple
 
 # Possible outcomes for a rule check.

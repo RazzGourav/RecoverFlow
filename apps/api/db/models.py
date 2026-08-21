@@ -38,7 +38,6 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-
 # ---------------------------------------------------------------------------
 # Base class
 # ---------------------------------------------------------------------------
@@ -158,6 +157,7 @@ class AuditEventType(str, enum.Enum):
     CASE_CLOSED = "CASE_CLOSED"
     HUMAN_ESCALATION = "HUMAN_ESCALATION"
     HUMAN_APPROVED = "HUMAN_APPROVED"
+    LLM_EXPLANATION_FAILED = "LLM_EXPLANATION_FAILED"
 
 
 class ReconciliationStatus(str, enum.Enum):
@@ -212,8 +212,8 @@ class Merchant(Base):
     )
 
     # Relationships
-    customers: Mapped[list["Customer"]] = relationship(back_populates="merchant")
-    policies: Mapped[list["Policy"]] = relationship(back_populates="merchant")
+    customers: Mapped[list[Customer]] = relationship(back_populates="merchant")
+    policies: Mapped[list[Policy]] = relationship(back_populates="merchant")
 
 
 class Customer(Base):
@@ -255,8 +255,8 @@ class Customer(Base):
     )
 
     # Relationships
-    merchant: Mapped["Merchant"] = relationship(back_populates="customers")
-    subscriptions: Mapped[list["Subscription"]] = relationship(
+    merchant: Mapped[Merchant] = relationship(back_populates="customers")
+    subscriptions: Mapped[list[Subscription]] = relationship(
         back_populates="customer"
     )
 
@@ -303,8 +303,8 @@ class Subscription(Base):
     )
 
     # Relationships
-    customer: Mapped["Customer"] = relationship(back_populates="subscriptions")
-    recovery_cases: Mapped[list["RecoveryCase"]] = relationship(
+    customer: Mapped[Customer] = relationship(back_populates="subscriptions")
+    recovery_cases: Mapped[list[RecoveryCase]] = relationship(
         back_populates="subscription"
     )
 
@@ -426,15 +426,15 @@ class RecoveryCase(Base):
     )
 
     # Relationships
-    subscription: Mapped["Subscription | None"] = relationship(
+    subscription: Mapped[Subscription | None] = relationship(
         back_populates="recovery_cases"
     )
-    candidate_actions: Mapped[list["CandidateAction"]] = relationship(
+    candidate_actions: Mapped[list[CandidateAction]] = relationship(
         back_populates="case"
     )
-    actions: Mapped[list["Action"]] = relationship(back_populates="case")
-    audit_events: Mapped[list["AuditEvent"]] = relationship(back_populates="case")
-    reconciliation_records: Mapped[list["ReconciliationRecord"]] = relationship(
+    actions: Mapped[list[Action]] = relationship(back_populates="case")
+    audit_events: Mapped[list[AuditEvent]] = relationship(back_populates="case")
+    reconciliation_records: Mapped[list[ReconciliationRecord]] = relationship(
         back_populates="case"
     )
 
@@ -476,7 +476,7 @@ class CandidateAction(Base):
     )
 
     # Relationships
-    case: Mapped["RecoveryCase"] = relationship(back_populates="candidate_actions")
+    case: Mapped[RecoveryCase] = relationship(back_populates="candidate_actions")
 
 
 class Action(Base):
@@ -527,8 +527,8 @@ class Action(Base):
     )
 
     # Relationships
-    case: Mapped["RecoveryCase"] = relationship(back_populates="actions")
-    reconciliation_records: Mapped[list["ReconciliationRecord"]] = relationship(
+    case: Mapped[RecoveryCase] = relationship(back_populates="actions")
+    reconciliation_records: Mapped[list[ReconciliationRecord]] = relationship(
         back_populates="action"
     )
 
@@ -585,7 +585,7 @@ class Policy(Base):
     )
 
     # Relationships
-    merchant: Mapped["Merchant"] = relationship(back_populates="policies")
+    merchant: Mapped[Merchant] = relationship(back_populates="policies")
 
 
 class AuditEvent(Base):
@@ -628,7 +628,7 @@ class AuditEvent(Base):
     )
 
     # Relationships
-    case: Mapped["RecoveryCase | None"] = relationship(back_populates="audit_events")
+    case: Mapped[RecoveryCase | None] = relationship(back_populates="audit_events")
 
 
 class ReconciliationRecord(Base):
@@ -679,5 +679,5 @@ class ReconciliationRecord(Base):
     )
 
     # Relationships
-    case: Mapped["RecoveryCase"] = relationship(back_populates="reconciliation_records")
-    action: Mapped["Action"] = relationship(back_populates="reconciliation_records")
+    case: Mapped[RecoveryCase] = relationship(back_populates="reconciliation_records")
+    action: Mapped[Action] = relationship(back_populates="reconciliation_records")

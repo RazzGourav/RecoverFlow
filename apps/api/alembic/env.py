@@ -17,8 +17,9 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 # ---------------------------------------------------------------------------
 # Make the API package importable from this file's working directory.
@@ -27,8 +28,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 # Import models so that Base.metadata knows about all tables.
 # This import must come AFTER sys.path is adjusted.
-from db.models import Base  # noqa: E402
-from config import settings  # noqa: E402
+from config import settings
+from db.models import Base
 
 # ---------------------------------------------------------------------------
 # Alembic Config object (provides access to alembic.ini values)

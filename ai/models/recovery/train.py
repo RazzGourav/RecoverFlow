@@ -13,7 +13,7 @@ from pathlib import Path
 import joblib
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report, precision_recall_fscore_support
+from sklearn.metrics import precision_recall_fscore_support
 from xgboost import XGBClassifier
 
 # Imports using absolute path from root

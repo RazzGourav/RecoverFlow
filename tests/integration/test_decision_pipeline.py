@@ -10,13 +10,13 @@ Why this exists:
 import pytest
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from apps.api.db.models import (
-    Merchant, Customer, Subscription, RecoveryCase, 
+    Merchant, RecoveryCase, 
     Policy, CandidateAction, Action, AuditEvent,
     FailureType, CaseStatus, AuthorizationStatus
 )

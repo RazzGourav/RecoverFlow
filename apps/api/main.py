@@ -12,7 +12,6 @@ Why this file exists:
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import Any
 
 import structlog
 from fastapi import FastAPI
@@ -59,9 +58,10 @@ async def lifespan(app: FastAPI):  # type: ignore[type-arg]
     Startup: verify database connectivity, initialize redis pool, and log readiness.
     Shutdown: dispose engine connections and close redis pool cleanly.
     """
-    from db.session import engine
     from arq import create_pool
     from arq.connections import RedisSettings
+
+    from db.session import engine
 
     logger.info(
         "api.starting",
