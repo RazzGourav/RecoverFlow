@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from db.session import get_db
+from dependencies.db import get_db
 from db.models import Action, AuthorizationStatus, ExecutionStatus
 from pydantic import BaseModel
 

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-from db.session import get_db
+from dependencies.db import get_db
 from db.models import Action, ReconciliationRecord, ReconciliationStatus, ActionType
 from pydantic import BaseModel
 
