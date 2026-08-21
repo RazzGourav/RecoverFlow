@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY apps/api/ .
 COPY integrations/ ./integrations/
 COPY workers/ ./workers/
+COPY domain/ ./domain/
 
 RUN useradd -r -u 1001 -g root recoverflow \
     && chown -R recoverflow:root /app
