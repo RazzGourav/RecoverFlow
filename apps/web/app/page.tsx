@@ -140,9 +140,30 @@ export default function HomePage(): React.JSX.Element {
         {/* Quick links */}
         <div className="flex flex-wrap gap-4 justify-center mt-2">
           <a
+            id="leak-graph-link"
+            href="/leak-graph"
+            className="btn-primary"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </svg>
+            Revenue Leak Graph
+          </a>
+          <a
             id="api-docs-link"
             href="/api/docs"
-            className="btn-primary"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-surface-700 border border-surface-600 text-text-primary font-semibold text-sm hover:bg-surface-600 transition-all duration-200 active:scale-95"
             target="_blank"
             rel="noopener noreferrer"
           >
