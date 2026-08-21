@@ -223,6 +223,7 @@ make smoke       # Run smoke tests
 | 5 | LLM Reasoning | ✅ Complete | AI explanation layer with strict schema validation and mutation safety |
 | 6 | Risk Firewall | ✅ Complete | PRD Module D: defense-only safety layer with five risk checks |
 | 7 | Action Layer | ✅ Done | |
+| 7.5 | Validation Layer | ✅ Done | |
 | 8 | Finance Truth Layer | 🏃 Next | |
 | 9 | Dashboard | 🔲 Upcoming | |
 | 10 | Simulation Lab | 🔲 Upcoming | |

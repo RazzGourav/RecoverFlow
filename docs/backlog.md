@@ -69,5 +69,19 @@ Format: | Item | Reason | Target Phase | GitHub Issue |
 - Webhook verification of `payment_link.paid` needs to be established in Phase 8 (Finance Truth Layer).
 
 **Next session read first:**
-- Check out a new branch for Phase 8.
+- Review Phase 8 (Finance Truth Layer) requirements in PRD.
+
+### Session Summary: Phase 7.5 (Validation Layer)
+**What was done:**
+- Implemented `ValidationOutcome` schema and logic in `integrations/integrations/validation.py`, `razorpay/validation.py`, and `mock/validation.py`.
+- Added `VALIDATION_BLOCKED` DB state to `ExecutionStatus` via an Alembic migration.
+- Wired the validation layer into `domain/finance/executor.py` to intercept actions before moving to `EXECUTING` by fetching the live state.
+- Wrote robust mock validation tests to simulate race conditions (e.g., payment already captured) and unsupported states.
+- Re-ran tests, committed to `phase-7.5-validation-layer`, and updated `README.md`.
+
+**What's still open:**
+- Docker Desktop pipe issue persists locally; CI pipeline is required to run true Docker-based integration smoke tests.
+
+**Next session read first:**
+- You are ready for Phase 8.
 - Review Phase 8 (Finance Truth Layer) requirements in PRD.
