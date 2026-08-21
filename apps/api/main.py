@@ -145,6 +145,8 @@ def create_app() -> FastAPI:
     app.include_router(budget_router, prefix="/budget", tags=["budget"])
     from routes.funnel import router as funnel_router
     app.include_router(funnel_router, prefix="/funnel", tags=["funnel"])
+    from routes.leak_graph import router as leak_graph_router
+    app.include_router(leak_graph_router, prefix="/leak-graph", tags=["leak-graph"])
 
     return app
 
