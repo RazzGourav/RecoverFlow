@@ -141,6 +141,8 @@ def create_app() -> FastAPI:
     app.include_router(cases_router, prefix="/cases", tags=["cases"])
     from routes.metrics import router as metrics_router
     app.include_router(metrics_router, prefix="/metrics", tags=["metrics"])
+    from routes.budget import router as budget_router
+    app.include_router(budget_router, prefix="/budget", tags=["budget"])
 
     return app
 
