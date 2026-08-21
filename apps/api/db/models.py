@@ -130,9 +130,12 @@ class ExecutionStatus(str, enum.Enum):
 
     PENDING = "PENDING"
     EXECUTING = "EXECUTING"
-    SUCCESS = "SUCCESS"
+    EXECUTED = "EXECUTED"
+    VERIFIED = "VERIFIED"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
+    TIMED_OUT = "TIMED_OUT"
+    EXCEPTION = "EXCEPTION"
 
 
 class RiskLevel(str, enum.Enum):

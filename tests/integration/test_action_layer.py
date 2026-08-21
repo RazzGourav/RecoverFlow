@@ -29,7 +29,7 @@ async def test_recovery_worker_poll_pending_actions(db_session, setup_test_case,
         # Update status so it's visible in DB
         stmt = select(Action).where(Action.id == action_id)
         action = (await session.execute(stmt)).scalar_one()
-        action.execution_status = ExecutionStatus.SUCCESS
+        action.execution_status = ExecutionStatus.EXECUTED
         await session.commit()
 
     monkeypatch.setattr("workers.recovery_worker.worker.execute_action", mock_execute_action)

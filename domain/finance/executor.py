@@ -61,7 +61,19 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
     if not action:
         raise ValueError(f"Action {action_id} not found.")
 
-    # 2. Guardrails: State machine checks
+    # 2. Guardrails: State machine checks & Idempotency
+    if action.execution_status in (ExecutionStatus.EXECUTED, ExecutionStatus.VERIFIED):
+        logger.info("action_already_executed", action_id=str(action_id), status=action.execution_status)
+        return action
+        
+    if action.provider_reference:
+        logger.info("action_has_provider_reference", action_id=str(action_id), provider_reference=action.provider_reference)
+        # Even if status is not EXECUTED for some reason, if it has a provider reference, it was executed.
+        # Self-correcting state
+        action.execution_status = ExecutionStatus.EXECUTED
+        await session.commit()
+        return action
+
     if action.execution_status != ExecutionStatus.PENDING:
         raise ValueError(
             f"Action {action_id} has invalid execution status: {action.execution_status}"
@@ -92,6 +104,7 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
     provider = get_provider()
 
     try:
+        import asyncio
         if action.action_type == ActionType.PAYMENT_LINK:
             # Prepare payload for payment link
             customer_details = {
@@ -104,21 +117,24 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
             # Use idempotency key as reference_id to ensure safe retries on the provider side
             reference_id = action.idempotency_key
 
-            # Provider calls are async
-            provider_ref = await provider.create_payment_link(
-                amount_paise=case.amount_paise,
-                currency=case.currency,
-                description=description,
-                customer_details=customer_details,
-                reference_id=reference_id,
+            # Provider calls are async. Apply a timeout to protect our system.
+            provider_ref = await asyncio.wait_for(
+                provider.create_payment_link(
+                    amount_paise=case.amount_paise,
+                    currency=case.currency,
+                    description=description,
+                    customer_details=customer_details,
+                    reference_id=reference_id,
+                ),
+                timeout=15.0
             )
             
             action.provider_reference = provider_ref
-            action.execution_status = ExecutionStatus.SUCCESS
+            action.execution_status = ExecutionStatus.EXECUTED
             reason_msg = "Successfully generated payment link."
 
         elif action.action_type == ActionType.NO_ACTION:
-            action.execution_status = ExecutionStatus.SUCCESS
+            action.execution_status = ExecutionStatus.EXECUTED
             reason_msg = "No action executed."
 
         else:
@@ -147,6 +163,34 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
             provider_reference=action.provider_reference,
         )
 
+    except asyncio.TimeoutError as e:
+        logger.error(
+            "action_execution_timeout",
+            action_id=str(action_id),
+            exc_info=True,
+        )
+        await session.rollback()
+        
+        action.execution_status = ExecutionStatus.TIMED_OUT
+        session.add(action)
+        
+        event = AuditEvent(
+            case_id=case.id,
+            event_type=AuditEventType.ACTION_EXECUTED,
+            reason=f"Execution timed out.",
+            actor="SYSTEM",
+            metadata_payload={
+                "action_id": str(action.id),
+                "action_type": action.action_type.value,
+                "error": "TimeoutError",
+            },
+        )
+        session.add(event)
+        await session.commit()
+        
+        # Don't raise, we handled it as an expected exception state
+        return action
+
     except Exception as e:
         logger.error(
             "action_execution_failed",
@@ -157,14 +201,14 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
         # Rollback any uncommitted changes from the try block
         await session.rollback()
         
-        # Re-fetch or reuse object to mark as failed
-        action.execution_status = ExecutionStatus.FAILED
+        # Re-fetch or reuse object to mark as EXCEPTION
+        action.execution_status = ExecutionStatus.EXCEPTION
         session.add(action)
         
         event = AuditEvent(
             case_id=case.id,
             event_type=AuditEventType.ACTION_EXECUTED,  # Or a specific failed event type if defined
-            reason=f"Execution failed: {str(e)[:200]}",
+            reason=f"Execution failed with exception: {str(e)[:200]}",
             actor="SYSTEM",
             metadata_payload={
                 "action_id": str(action.id),
@@ -175,6 +219,6 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
         session.add(event)
         await session.commit()
         
-        raise RuntimeError(f"Failed to execute action {action_id}: {e}") from e
+        return action
 
     return action

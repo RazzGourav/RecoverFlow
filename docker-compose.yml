@@ -172,6 +172,30 @@ services:
       api:
         condition: service_healthy
 
+  # -------------------------------------------------------------------------
+  # Reconciliation Worker (Phase 7 Action Verification)
+  # -------------------------------------------------------------------------
+  reconciliation_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: recoverflow-reconciliation-worker
+    restart: unless-stopped
+    command: ["arq", "workers.reconciliation_worker.worker.WorkerSettings"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://recoverflow:recoverflow@postgres:5432/recoverflow
+      DATABASE_SYNC_URL: postgresql://recoverflow:recoverflow@postgres:5432/recoverflow
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+    networks:
+      - recoverflow
+    depends_on:
+      api:
+        condition: service_healthy
+
 
   # -------------------------------------------------------------------------
   # Next.js Frontend

@@ -20,7 +20,7 @@ from db.models import Action, AuthorizationStatus, ExecutionStatus
 from db.session import AsyncSessionLocal
 from sqlalchemy import select
 
-from domain.recovery.executor import execute_action
+from domain.finance.executor import execute_action
 
 logger = structlog.get_logger(__name__)
 
