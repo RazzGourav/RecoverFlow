@@ -137,6 +137,8 @@ def create_app() -> FastAPI:
     # --- Routers ------------------------------------------------------------
     app.include_router(health_router)
     app.include_router(webhooks_router)
+    from routes.cases import router as cases_router
+    app.include_router(cases_router, prefix="/cases", tags=["cases"])
 
     return app
 
