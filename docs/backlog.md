@@ -121,3 +121,17 @@ Format: | Item | Reason | Target Phase | GitHub Issue |
 **Next session read first:**
 - You are ready for Phase 10 (Dashboard UI / Simulation Lab).
 - The funnel backend is complete — the next phase should consume `GET /funnel/summary` and other APIs to build the visual dashboard.
+
+### Session Summary: Phase 9.5 (Revenue Leak Graph)
+**What was done:**
+- Built `GET /leak-graph` API endpoint with genuine multi-table joins across `funnel_events`, `payment_events`, `recovery_cases`, `candidate_actions`, and `reconciliation_records`.
+- Each leak point includes root-cause breakdown (failure_type), affected segment breakdown, and linked recovery actions with expected recovery amounts.
+- Built full funnel visualization using Recharts BarChart in a new `/leak-graph` Next.js page.
+- Created reusable `DataSourceBadge` component for permanent honesty labeling ("Simulated traffic data" vs "Live system data") on every stage.
+- Every stage card shows count, value, drop-off rate, and a drill-through button to inspect the leak details (root causes, segments, recovery actions).
+- Added link from the home page to the Leak Graph page.
+- Fixed Docker builds: `domain/` directory now correctly included in Dockerfile.api and Dockerfile.worker.
+- Added integration test verifying stage counts match raw DB queries.
+
+**Next session read first:**
+- Phase 10 (Simulation Lab / Dashboard Polish).

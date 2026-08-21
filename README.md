@@ -227,6 +227,7 @@ make smoke       # Run smoke tests
 | 8 | Finance Truth Layer | ✅ Done | |
 | 8.5 | Budget Optimizer | ✅ Done | |
 | 9 | Funnel Infrastructure | ✅ Done | |
+| 9.5 | Revenue Leak Graph | ✅ Done | Full funnel visualization with drill-through |
 | 10 | Simulation Lab | 🏃 Next | |
 | 11 | Failure Center | 🔲 Upcoming | |
 | 12 | Product Polish | 🔲 Upcoming | |
