@@ -32,9 +32,22 @@ The generator explicitly embeds structural variance and edge cases:
 - **Frequency Abuse**: `high_frequency_contact` flags cases that have exhausted policy limits.
 - **Duplicates**: Roughly 3% of cases have a secondary duplicate row (`is_duplicate=True`) mirroring the exact `case_id` to test idempotency boundaries.
 
+## Phase 9 Funnel Simulation
+Starting in Phase 9, this script was augmented by `data/synthetic/generate_funnel.py` to generate top-of-funnel traffic (SITE_VISIT → PRODUCT_VIEW → ADD_TO_CART → CHECKOUT_STARTED → PAYMENT_ATTEMPTED). 
+
+### Funnel Drop-off Assumptions
+The generator uses hardcoded conversion rates to simulate realistic drop-offs:
+- **SITE_VISIT → PRODUCT_VIEW**: 40% conversion
+- **PRODUCT_VIEW → ADD_TO_CART**: 35% conversion
+- **ADD_TO_CART → CHECKOUT_STARTED**: 60% conversion
+- **CHECKOUT_STARTED → PAYMENT_ATTEMPTED**: 72% conversion
+
+The generator explicitly links a subset of `PAYMENT_ATTEMPTED` events back to real `PaymentEvent` rows in the database, ensuring that the synthetic top-of-funnel connects perfectly to the real, deterministic recovery bottom-of-funnel. **All top-of-funnel data (visits, views, carts) is strictly simulated traffic data.**
+
 ## Limitations
 - **No Causal Accuracy**: The recovery probabilities are heavily simplified (e.g. `base_prob + modifier`). It does not represent actual market responsiveness.
 - **Uniform Modifiers**: Human escalation boosts success uniformly by 25%, which is not realistic in a noisy, real-world cohort.
 - **Action Selection is Random**: In reality, actions are chosen by a policy or model; in this dataset, they are assigned randomly, meaning the data contains inherent noise regarding optimal action paths.
 
 **Important for Demo Day**: This dataset is completely synthetic. It guarantees structural validity (types, edge cases) but does not contain true causal insights from live merchant data.
+
