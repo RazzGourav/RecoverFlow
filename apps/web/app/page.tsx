@@ -1,292 +1,198 @@
 import type { Metadata } from "next";
-
-/**
- * RecoverFlow landing page (Phase 0 — stack validation placeholder).
- *
- * Why: Every phase must leave the system in a demoable state.  In Phase 0,
- * "demoable" means a visually compelling page that confirms the stack is
- * alive and communicates the product vision to anyone who clones the repo
- * and runs `docker compose up`.
- *
- * The dashboard and all feature screens are built in later phases.
- */
+import Link from "next/link";
+import { Suspense } from "react";
+import { LeakGraph } from "./components/LeakGraph";
 
 export const metadata: Metadata = {
-  title: "RecoverFlow — Phase 0 Foundation",
-  description:
-    "AI Revenue Recovery Control Plane — stack validation page.",
+  title: "Revenue Control Tower | RecoverFlow",
+  description: "AI Revenue Recovery Control Plane dashboard.",
 };
 
-export default function HomePage(): React.JSX.Element {
+async function getMetrics() {
+  try {
+    const res = await fetch("http://api:8000/metrics", { cache: "no-store" });
+    if (!res.ok) return null;
+    return res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+async function getFeed() {
+  try {
+    const res = await fetch("http://api:8000/dashboard/feed", { cache: "no-store" });
+    if (!res.ok) return null;
+    return res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+// Re-use the existing leak graph data fetching logic so we can embed the leak graph directly
+async function getLeakGraphData() {
+  try {
+    const res = await fetch("http://api:8000/leak-graph", { cache: "no-store" });
+    if (!res.ok) return null;
+    return res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+export default async function RevenueControlTower() {
+  const [metrics, feed, leakData] = await Promise.all([
+    getMetrics(),
+    getFeed(),
+    getLeakGraphData()
+  ]);
+
+  const recentCases = feed?.recent_cases || [];
+  const highRiskAlerts = feed?.high_risk_alerts || [];
+
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-4 py-16 overflow-hidden relative">
-      {/* Ambient background glow */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 overflow-hidden"
-      >
-        <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-brand-600/20 blur-[120px]" />
-        <div className="absolute -bottom-40 -right-40 w-[600px] h-[600px] rounded-full bg-brand-800/20 blur-[120px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-brand-500/10 blur-[80px]" />
+    <div className="min-h-screen bg-[#0b1326] text-white p-8 font-sans selection:bg-brand-500/30">
+      {/* Background glow effects for glassmorphism */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-[#581c87]/20 rounded-full blur-[100px]" />
+        <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-[#0f172a]/40 rounded-full blur-[120px]" />
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 max-w-4xl w-full mx-auto text-center flex flex-col items-center gap-8 animate-fade-in">
-        {/* Status badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-500/10 border border-brand-500/30 text-brand-300 text-sm font-medium">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
-          </span>
-          Phase 0 — Foundation Complete
-        </div>
+      <div className="relative z-10 max-w-7xl mx-auto space-y-8">
+        
+        {/* Header */}
+        <header className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-white/90">Revenue Control Tower</h1>
+            <p className="text-white/50 text-sm mt-1">Live monitoring and autonomous action command center.</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <Link href="/cases" className="text-sm font-medium text-brand-300 hover:text-brand-200 bg-brand-900/30 border border-brand-500/20 px-4 py-2 rounded-lg backdrop-blur-md transition-colors">
+              View All Cases
+            </Link>
+            <Link href="/policies" className="text-sm font-medium text-white hover:text-brand-100 bg-[#06b6d4]/20 border border-[#06b6d4]/40 px-4 py-2 rounded-lg backdrop-blur-md transition-colors">
+              Policy Studio
+            </Link>
+          </div>
+        </header>
 
-        {/* Wordmark */}
-        <div className="flex flex-col items-center gap-2">
-          <h1 className="text-display font-bold text-gradient leading-none tracking-tight">
-            RecoverFlow
-          </h1>
-          <p className="text-xl text-text-secondary font-medium">
-            AI Revenue Recovery Control Plane
-          </p>
-        </div>
-
-        {/* Tagline */}
-        <p className="max-w-2xl text-lg text-text-secondary leading-relaxed">
-          Predicts which failures can be recovered, chooses the safest
-          intervention, executes under merchant-defined limits, verifies
-          financial outcomes, and measures incremental recovery against a
-          baseline.
-        </p>
-
-        {/* Metric preview cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-2xl mt-4">
-          <MetricCard
-            label="Revenue at Risk"
-            value="₹2.47L"
-            sublabel="demo dataset"
-            color="danger"
+        {/* Top Metrics Row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <MetricCard 
+            title="Incremental Recovered"
+            value={metrics ? `₹${(metrics.incremental_recovered_revenue_paise / 100).toLocaleString()}` : "—"}
+            color="text-[#06b6d4]"
           />
-          <MetricCard
-            label="AI Recoverable"
-            value="₹1.82L"
-            sublabel="predicted"
-            color="warning"
+          <MetricCard 
+            title="Recovery Rate"
+            value={metrics ? `${metrics.recovery_rate_percent}%` : "—"}
+            color="text-[#d946ef]"
           />
-          <MetricCard
-            label="Verified Recovery"
-            value="₹1.46L"
-            sublabel="post-reconciliation"
-            color="success"
+          <MetricCard 
+            title="Reconciliation Exceptions"
+            value={metrics ? `${metrics.reconciliation_exception_rate_percent}%` : "—"}
+            color="text-white"
           />
         </div>
 
-        {/* Architecture flow */}
-        <div className="glass-card w-full max-w-2xl p-6 text-left mt-4">
-          <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4">
-            Decision Pipeline
-          </h2>
-          <div className="flex flex-wrap gap-2 items-center justify-center font-mono text-xs">
-            {[
-              "Payment Event",
-              "→",
-              "Risk Firewall",
-              "→",
-              "ML Predictor",
-              "→",
-              "Policy Engine",
-              "→",
-              "Action Layer",
-              "→",
-              "Finance Truth",
-              "→",
-              "Audit Log",
-            ].map((step, i) => (
-              <span
-                key={i}
-                className={
-                  step === "→"
-                    ? "text-text-muted"
-                    : "px-2.5 py-1 rounded-lg bg-surface-700 border border-surface-600 text-brand-300"
-                }
-              >
-                {step}
+        {/* Funnel Graph Section */}
+        <section className="bg-[#1e1b4b]/40 backdrop-blur-2xl rounded-2xl border border-white/10 p-6 shadow-2xl">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-white/80">Revenue Leak Funnel</h2>
+            <Link href="/leak-graph" className="text-xs text-[#06b6d4] hover:underline">Expand View</Link>
+          </div>
+          {leakData ? (
+             <LeakGraph initialData={leakData} />
+          ) : (
+            <div className="h-64 flex items-center justify-center text-white/40">No funnel data available</div>
+          )}
+        </section>
+
+        {/* Two-column Bottom Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* Recent Cases */}
+          <section className="bg-[#1e1b4b]/40 backdrop-blur-2xl rounded-2xl border border-white/10 p-6 shadow-2xl flex flex-col h-[400px]">
+            <h2 className="text-lg font-semibold text-white/80 mb-4 flex items-center justify-between">
+              Recent Cases
+              <span className="text-xs font-normal text-white/40 px-2 py-1 rounded bg-white/5">{recentCases.length} records</span>
+            </h2>
+            <div className="overflow-y-auto flex-1 pr-2 space-y-3 custom-scrollbar">
+              {recentCases.map((c: any) => (
+                <Link href={`/cases/${c.id}`} key={c.id} className="block bg-black/20 hover:bg-black/40 border border-white/5 rounded-xl p-4 transition-colors">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-sm font-medium text-white/70 truncate mr-4">{c.id.split("-")[0]}...</span>
+                    <span className="text-sm font-semibold text-white">₹{(c.amount_paise / 100).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className={`px-2 py-0.5 rounded-full ${getStatusColor(c.status)}`}>
+                      {c.status}
+                    </span>
+                    <span className="text-white/40">{new Date(c.created_at).toLocaleTimeString()}</span>
+                  </div>
+                </Link>
+              ))}
+              {recentCases.length === 0 && (
+                <div className="text-center text-white/40 py-8 text-sm">No recent cases found.</div>
+              )}
+            </div>
+          </section>
+
+          {/* High-Risk Alerts */}
+          <section className="bg-[#1e1b4b]/40 backdrop-blur-2xl rounded-2xl border border-[#d946ef]/20 p-6 shadow-2xl flex flex-col h-[400px] relative overflow-hidden">
+            {/* Subtle alert pulsing background */}
+            <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-[#d946ef]/5 rounded-full blur-[80px] animate-pulse pointer-events-none" />
+            
+            <h2 className="text-lg font-semibold text-[#d946ef] mb-4 flex items-center justify-between relative z-10">
+              <span className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#d946ef] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#d946ef]"></span>
+                </span>
+                High-Risk Alerts
               </span>
-            ))}
-          </div>
-        </div>
+              <span className="text-xs font-normal text-white/40 px-2 py-1 rounded bg-white/5">{highRiskAlerts.length} active</span>
+            </h2>
+            <div className="overflow-y-auto flex-1 pr-2 space-y-3 custom-scrollbar relative z-10">
+              {highRiskAlerts.map((c: any) => (
+                <Link href={`/cases/${c.id}`} key={c.id} className="block bg-black/20 hover:bg-[#d946ef]/10 border border-[#d946ef]/20 rounded-xl p-4 transition-colors">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-sm font-medium text-white/90 truncate mr-4">Action Required</span>
+                    <span className="text-sm font-semibold text-[#d946ef]">₹{(c.amount_paise / 100).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-white/60">Risk Level: HIGH</span>
+                    <span className="text-white/40">{new Date(c.created_at).toLocaleTimeString()}</span>
+                  </div>
+                </Link>
+              ))}
+              {highRiskAlerts.length === 0 && (
+                <div className="text-center text-white/40 py-8 text-sm">No high-risk alerts currently active.</div>
+              )}
+            </div>
+          </section>
 
-        {/* Phase status grid */}
-        <div className="glass-card w-full max-w-2xl p-6">
-          <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4">
-            Build Progress
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-            <PhaseChip phase="0" label="Foundation" done />
-            <PhaseChip phase="1" label="Event Ingestion" />
-            <PhaseChip phase="2" label="Data Engine" />
-            <PhaseChip phase="3" label="ML Engine" />
-            <PhaseChip phase="4" label="Decision Engine" />
-            <PhaseChip phase="5" label="LLM Reasoning" />
-            <PhaseChip phase="6" label="Risk Firewall" />
-            <PhaseChip phase="7" label="Action Layer" />
-            <PhaseChip phase="8" label="Finance Truth" />
-            <PhaseChip phase="9" label="Dashboard" />
-            <PhaseChip phase="10" label="Simulation Lab" />
-            <PhaseChip phase="11" label="Failure Center" />
-          </div>
         </div>
-
-        {/* Quick links */}
-        <div className="flex flex-wrap gap-4 justify-center mt-2">
-          <a
-            id="leak-graph-link"
-            href="/leak-graph"
-            className="btn-primary"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </svg>
-            Revenue Leak Graph
-          </a>
-          <a
-            id="api-docs-link"
-            href="/api/docs"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-surface-700 border border-surface-600 text-text-primary font-semibold text-sm hover:bg-surface-600 transition-all duration-200 active:scale-95"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <polyline points="10 9 9 9 8 9" />
-            </svg>
-            API Docs
-          </a>
-          <a
-            id="github-link"
-            href="https://github.com/RazzGourav/RecoverFlow"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-surface-700 border border-surface-600 text-text-primary font-semibold text-sm hover:bg-surface-600 transition-all duration-200 active:scale-95"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.1 3.29 9.41 7.86 10.94.57.1.78-.25.78-.55v-1.92c-3.2.7-3.87-1.53-3.87-1.53-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.75 1.18 1.02 1.74 2.68 1.24 3.33.95.1-.74.4-1.24.73-1.52-2.55-.29-5.23-1.27-5.23-5.67 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.15 1.17A10.9 10.9 0 0 1 12 6.84c.97 0 1.95.13 2.86.38 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.18 1.82 1.18 3.07 0 4.41-2.69 5.38-5.25 5.66.41.36.78 1.07.78 2.16v3.2c0 .31.21.66.79.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z" />
-            </svg>
-            GitHub
-          </a>
-        </div>
-
-        {/* Build info */}
-        <p className="text-xs text-text-muted mt-4">
-          Razorpay /buildathon · Track 03 — AI Revenue Recovery ·{" "}
-          <span className="text-brand-400">Phase 0 Complete</span>
-        </p>
       </div>
-    </main>
-  );
-}
-
-/* ---------------------------------------------------------------------------
-   Sub-components (co-located — will be extracted to components/ in Phase 9)
-   --------------------------------------------------------------------------- */
-
-interface MetricCardProps {
-  label: string;
-  value: string;
-  sublabel: string;
-  color: "danger" | "warning" | "success";
-}
-
-function MetricCard({ label, value, sublabel, color }: MetricCardProps): React.JSX.Element {
-  const colorMap = {
-    danger: "text-danger",
-    warning: "text-warning",
-    success: "text-success",
-  } as const;
-
-  return (
-    <div className="metric-card animate-slide-up">
-      <span className="metric-label">{label}</span>
-      <span className={`metric-value ${colorMap[color]}`}>{value}</span>
-      <span className="text-2xs text-text-muted mt-1">{sublabel}</span>
     </div>
   );
 }
 
-interface PhaseChipProps {
-  phase: string;
-  label: string;
-  done?: boolean;
-}
-
-function PhaseChip({ phase, label, done = false }: PhaseChipProps): React.JSX.Element {
+function MetricCard({ title, value, color }: { title: string; value: string; color: string }) {
   return (
-    <div
-      className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm ${
-        done
-          ? "bg-success/5 border-success/30 text-success"
-          : "bg-surface-700/50 border-surface-600/50 text-text-muted"
-      }`}
-    >
-      <span
-        className={`text-xs font-mono px-1.5 py-0.5 rounded font-bold ${
-          done
-            ? "bg-success/20 text-success"
-            : "bg-surface-600/80 text-text-muted"
-        }`}
-      >
-        P{phase}
-      </span>
-      <span className="truncate">{label}</span>
-      {done && (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="ml-auto flex-shrink-0"
-          aria-hidden="true"
-        >
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
-      )}
+    <div className="bg-[#1e1b4b]/40 backdrop-blur-2xl rounded-2xl border border-white/10 p-6 shadow-2xl flex flex-col justify-center min-h-[140px] hover:border-white/20 transition-all">
+      <h3 className="text-sm font-medium text-white/50 mb-2">{title}</h3>
+      <div className={`text-4xl font-bold tracking-tight ${color} filter drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]`}>
+        {value}
+      </div>
     </div>
   );
+}
+
+function getStatusColor(status: string) {
+  switch (status) {
+    case 'RECOVERED': return 'bg-[#06b6d4]/20 text-[#06b6d4] border border-[#06b6d4]/30';
+    case 'PENDING': return 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30';
+    case 'FAILED': return 'bg-red-500/20 text-red-300 border border-red-500/30';
+    default: return 'bg-white/10 text-white/60 border border-white/20';
+  }
 }

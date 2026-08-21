@@ -206,6 +206,7 @@ services:
       dockerfile: Dockerfile.web
       args:
         NEXT_PUBLIC_API_URL: http://localhost:8000
+        INTERNAL_API_URL: http://api:8000
     container_name: recoverflow-frontend
     restart: unless-stopped
     environment:
