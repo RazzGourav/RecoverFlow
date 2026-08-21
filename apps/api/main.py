@@ -144,6 +144,8 @@ def create_app() -> FastAPI:
     app.include_router(metrics_router, prefix="/metrics", tags=["metrics"])
     from routes.budget import router as budget_router
     app.include_router(budget_router, prefix="/budget", tags=["budget"])
+    from routes.funnel import router as funnel_router
+    app.include_router(funnel_router, prefix="/funnel", tags=["funnel"])
 
     return app
 

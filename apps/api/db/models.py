@@ -178,6 +178,16 @@ class ReconciliationStatus(str, enum.Enum):
     PENDING = "PENDING"
 
 
+class FunnelEventType(str, enum.Enum):
+    """Stages of the synthetic revenue funnel."""
+    
+    SITE_VISIT = "SITE_VISIT"
+    PRODUCT_VIEW = "PRODUCT_VIEW"
+    ADD_TO_CART = "ADD_TO_CART"
+    CHECKOUT_STARTED = "CHECKOUT_STARTED"
+    PAYMENT_ATTEMPTED = "PAYMENT_ATTEMPTED"
+
+
 # ---------------------------------------------------------------------------
 # Helper: shared timestamp columns
 # ---------------------------------------------------------------------------
@@ -361,6 +371,13 @@ class PaymentEvent(Base):
         UUID(as_uuid=True),
         ForeignKey("recovery_cases.id", ondelete="SET NULL"),
         nullable=True,
+    )
+    # Phase 9: Link back to the synthetic top-of-funnel session that originated this payment
+    session_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sessions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
     )
 
 
@@ -695,3 +712,60 @@ class ReconciliationRecord(Base):
     # Relationships
     case: Mapped[RecoveryCase] = relationship(back_populates="reconciliation_records")
     action: Mapped[Action] = relationship(back_populates="reconciliation_records")
+
+
+class Session(Base):
+    """
+    A top-of-funnel customer session. Used to map the Revenue Leak Graph.
+    This data is predominantly syntheticly generated for demo purposes.
+    """
+    __tablename__ = "sessions"
+    
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    # Anonymous sessions exist prior to login/checkout
+    customer_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("customers.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    # Device, browser, channel metadata
+    metadata_: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
+    
+    events: Mapped[list[FunnelEvent]] = relationship(back_populates="session")
+
+
+class FunnelEvent(Base):
+    """
+    An event occurring within a Session, mapping to the funnel stages.
+    """
+    __tablename__ = "funnel_events"
+    __table_args__ = (
+        Index("ix_funnel_events_session_type", "session_id", "event_type"),
+    )
+    
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    event_type: Mapped[FunnelEventType] = mapped_column(
+        Enum(FunnelEventType), nullable=False
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
+    )
+    product_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    cart_value_paise: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    
+    session: Mapped[Session] = relationship(back_populates="events")
+

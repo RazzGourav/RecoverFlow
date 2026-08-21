@@ -226,8 +226,8 @@ make smoke       # Run smoke tests
 | 7.5 | Validation Layer | ✅ Done | |
 | 8 | Finance Truth Layer | ✅ Done | |
 | 8.5 | Budget Optimizer | ✅ Done | |
-| 9 | Dashboard | 🏃 Next | |
-| 10 | Simulation Lab | 🔲 Upcoming | |
+| 9 | Funnel Infrastructure | ✅ Done | |
+| 10 | Simulation Lab | 🏃 Next | |
 | 11 | Failure Center | 🔲 Upcoming | |
 | 12 | Product Polish | 🔲 Upcoming | |
 | 13 | Evaluation Freeze | 🔲 Upcoming | |

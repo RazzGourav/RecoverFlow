@@ -101,3 +101,23 @@ Format: | Item | Reason | Target Phase | GitHub Issue |
 **Next session read first:**
 - You are ready for Phase 9 (Dashboard).
 - Review Phase 9 requirements in the PRD, which will start bringing all this data into the UI.
+
+### Session Summary: Phase 9 (Funnel Infrastructure)
+**What was done:**
+- Created `sessions` and `funnel_events` tables with `FunnelEventType` enum via Alembic migration.
+- Bridged top-of-funnel data to real recovery pipeline by adding `session_id` FK on `payment_events`.
+- Built `EventTrackingProvider` interface (`integrations/analytics/base.py`) with `SyntheticProvider` implementation — mirrors the Phase 1 PaymentProvider abstraction pattern.
+- Implemented idempotent `POST /funnel/events/track` ingestion endpoint.
+- Created deterministic `data/synthetic/generate_funnel.py` (seed 42, modeled drop-off rates).
+- Built `scripts/simulate_live_sessions.py` live-fire simulator — verified working against dockerized API.
+- Implemented `GET /funnel/summary` aggregation endpoint computing stage counts and drop-off rates from DB.
+- Fixed Docker build: added `COPY domain/` to Dockerfiles, corrected `get_db` import paths, resolved `apps.api.db.models` vs `db.models` import chain for Docker context.
+- Updated `docs/evaluation/dataset-card.md` with funnel simulation assumptions.
+
+**What's still open:**
+- Dashboard UI (the actual React/frontend) is not yet built — this phase was backend infrastructure only.
+- `smoke_test.sh` via Docker is still pending CI implementation.
+
+**Next session read first:**
+- You are ready for Phase 10 (Dashboard UI / Simulation Lab).
+- The funnel backend is complete — the next phase should consume `GET /funnel/summary` and other APIs to build the visual dashboard.
