@@ -222,8 +222,8 @@ make smoke       # Run smoke tests
 | 4 | Decision Engine | ✅ Complete | Deterministic policy engine, expected value ranking, audit logger |
 | 5 | LLM Reasoning | ✅ Complete | AI explanation layer with strict schema validation and mutation safety |
 | 6 | Risk Firewall | ✅ Complete | PRD Module D: defense-only safety layer with five risk checks |
-| 7 | Action Layer | 🏃 Next | |
-| 8 | Finance Truth Layer | 🔲 Upcoming | |
+| 7 | Action Layer | ✅ Done | |
+| 8 | Finance Truth Layer | 🏃 Next | |
 | 9 | Dashboard | 🔲 Upcoming | |
 | 10 | Simulation Lab | 🔲 Upcoming | |
 | 11 | Failure Center | 🔲 Upcoming | |

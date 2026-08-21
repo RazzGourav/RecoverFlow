@@ -39,3 +39,35 @@ Format: | Item | Reason | Target Phase | GitHub Issue |
 **Next session read first:**
 - Run `alembic revision --autogenerate` for the AuditEventType enum as soon as Docker is up.
 - Review Phase 6 (Risk Firewall) requirements in PRD.
+
+### Session Summary: Phase 6 (Risk Firewall)
+**What was done:**
+- Implemented PRD Module D (Risk Firewall) with 5 independent risk checks (transaction, frequency, amount, behavioral, policy).
+- Aggregated checks into a defense-only layer that never overrides a BLOCK but can upgrade an ALLOW to REVIEW/BLOCK.
+- Added `RISK_FIREWALL_EVALUATED` and `RISK_FIREWALL_BLOCKED` to `AuditEventType` via an Alembic migration.
+- Wired the firewall into `domain/policies/pipeline.py` to evaluate before the LLM explanation layer.
+- Exhaustive unit tests and integration tests written and passing. 
+- All code pushed to `phase-6-risk-firewall`.
+
+**What's still open:**
+- PR for `phase-6-risk-firewall` needs to be reviewed and merged into `main`.
+
+**Next session read first:**
+- You are on branch `phase-7-action-layer` (based on `phase-6-risk-firewall`). Wait for `main` merge if required.
+- Review Phase 7 (Action Layer) requirements in PRD.
+
+### Session Summary: Phase 7 (Action Layer)
+**What was done:**
+- Implemented `domain/recovery/executor.py` to deterministically execute AUTONOMOUS or APPROVED actions via Razorpay Test Mode/MockProvider.
+- Scaffolded a new arq worker (`workers/recovery_worker/`) to process actions safely in the background, including a 60-second cron fallback to ensure eventual execution for any dropped jobs.
+- Wired the pipeline (`domain/policies/pipeline.py`) to enqueue jobs synchronously after logging the policy decision.
+- Unit and integration tests written, and `docker-compose.yml` updated with the `recovery_worker` service.
+- All pre-push and smoke tests pass.
+
+**What's still open:**
+- PR for `phase-7-action-layer` needs to be reviewed and merged into `main`.
+- Webhook verification of `payment_link.paid` needs to be established in Phase 8 (Finance Truth Layer).
+
+**Next session read first:**
+- Check out a new branch for Phase 8.
+- Review Phase 8 (Finance Truth Layer) requirements in PRD.
