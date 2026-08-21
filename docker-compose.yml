@@ -97,7 +97,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://recoverflow:recoverflow@postgres:5432/recoverflow
       DATABASE_SYNC_URL: postgresql://recoverflow:recoverflow@postgres:5432/recoverflow
       REDIS_URL: redis://redis:6379/0
-      CORS_ORIGINS: "http://localhost:3000,http://frontend:3000"
+      CORS_ORIGINS: '["http://localhost:3000","http://frontend:3000"]'
       ENVIRONMENT: development
       LOG_LEVEL: INFO
     # Override CMD: run migrations then start uvicorn.
