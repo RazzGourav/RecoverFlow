@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
 
     # --- API ---------------------------------------------------------------
-    secret_key: str = "change_me_before_production"
+    secret_key: str = "change_me_before_production"  # noqa: S105
     cors_origins: list[str] = ["http://localhost:3000"]
     environment: str = "development"
     log_level: str = "INFO"
@@ -42,8 +42,8 @@ class Settings(BaseSettings):
     # --- Razorpay ----------------------------------------------------------
     payment_provider: str = "mock"
     razorpay_key_id: str = "rzp_test_REPLACE_ME"
-    razorpay_key_secret: str = "REPLACE_ME"
-    razorpay_webhook_secret: str = "REPLACE_ME"
+    razorpay_key_secret: str = "REPLACE_ME"  # noqa: S105
+    razorpay_webhook_secret: str = "REPLACE_ME"  # noqa: S105
 
     # --- LLM ---------------------------------------------------------------
     llm_provider: str = "mock"

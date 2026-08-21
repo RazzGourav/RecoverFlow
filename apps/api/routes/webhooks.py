@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from typing import Annotated
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -47,8 +48,8 @@ def verify_razorpay_signature(payload: bytes, signature: str | None, secret: str
 )
 async def razorpay_webhook(
     request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
     x_razorpay_signature: str | None = Header(None),
-    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
     Process inbound Razorpay webhooks securely.
@@ -58,7 +59,7 @@ async def razorpay_webhook(
 
     # We must skip signature validation if the secret is explicitly "REPLACE_ME"
     # and we are running tests or local dev (without real razorpay setup).
-    if settings.razorpay_webhook_secret != "REPLACE_ME":
+    if settings.razorpay_webhook_secret != "REPLACE_ME":  # noqa: S105
         is_valid = verify_razorpay_signature(
             raw_body, x_razorpay_signature, settings.razorpay_webhook_secret
         )
@@ -74,12 +75,12 @@ async def razorpay_webhook(
     # 2. Parse JSON
     try:
         payload = json.loads(raw_body)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
         logger.warning("webhook.invalid_json")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid JSON payload",
-        )
+        ) from exc
 
     # 3. Extract event ID and type
     # If the payload is wrapped in a `contains` key or just top level, Razorpay sends:
@@ -131,7 +132,11 @@ async def razorpay_webhook(
             "normalize_payment_event",
             payment_event_id=str(event_record.id),
         )
-        logger.info("webhook.enqueued", external_event_id=event_id, internal_id=str(event_record.id))
+        logger.info(
+            "webhook.enqueued",
+            external_event_id=event_id,
+            internal_id=str(event_record.id),
+        )
     else:
         logger.warning("webhook.arq_pool_missing", external_event_id=event_id)
 
