@@ -83,5 +83,21 @@ Format: | Item | Reason | Target Phase | GitHub Issue |
 - Docker Desktop pipe issue persists locally; CI pipeline is required to run true Docker-based integration smoke tests.
 
 **Next session read first:**
-- You are ready for Phase 8.
 - Review Phase 8 (Finance Truth Layer) requirements in PRD.
+
+### Session Summary: Phase 8 (Finance Truth) & Phase 8.5 (Budget Optimizer)
+**What was done:**
+- Implemented `domain/finance/reconciliation.py` to reconcile expected recovery amounts against actuals from the payment provider (`MATCHED`/`PARTIAL`/`EXCEPTION`).
+- Added the `PARTIAL` reconciliation status via Alembic migration.
+- Built a metrics API `apps/api/routes/metrics.py` calculating Incremental Revenue, Recovery Rate, and Exception Rate.
+- Added deterministic baselines (`always_retry`, `fixed_schedule`, `simple_rule`) and generated the `phase8-benchmark.md` evaluation report proving RecoverFlow's efficacy.
+- Built the Budget Optimizer (`domain/recovery/budget_optimizer.py`), an allocation layer applying a greedy expected-value knapsack approximation to fund actions.
+- Documented the architecture for the "Stale Webhook Defense" (Phase 7.5 + Phase 8) and Optimizer algorithmic assumptions.
+- Wrote integration and unit tests proving the math, safety boundaries, and allocator constraints.
+
+**What's still open:**
+- Docker Desktop pipeline continues to be blocked on host communication, so `smoke_test.sh` via Docker is pending CI implementation.
+
+**Next session read first:**
+- You are ready for Phase 9 (Dashboard).
+- Review Phase 9 requirements in the PRD, which will start bringing all this data into the UI.
