@@ -149,6 +149,31 @@ services:
         condition: service_healthy
 
   # -------------------------------------------------------------------------
+  # Recovery Worker (Phase 7 Action Execution)
+  # -------------------------------------------------------------------------
+  recovery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: recoverflow-recovery-worker
+    restart: unless-stopped
+    command: ["arq", "workers.recovery_worker.worker.WorkerSettings"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://recoverflow:recoverflow@postgres:5432/recoverflow
+      DATABASE_SYNC_URL: postgresql://recoverflow:recoverflow@postgres:5432/recoverflow
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+    networks:
+      - recoverflow
+    depends_on:
+      api:
+        condition: service_healthy
+
+
+  # -------------------------------------------------------------------------
   # Next.js Frontend
   # -------------------------------------------------------------------------
   frontend:

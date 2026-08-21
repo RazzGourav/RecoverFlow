@@ -303,3 +303,19 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase) -> No
         policy_version=policy.version,
         context=context_data
     )
+
+    # 9. Enqueue Execution (Phase 7)
+    if auth_status == AuthorizationStatus.AUTONOMOUS:
+        from arq import create_pool
+        from arq.connections import RedisSettings
+        from config import settings
+        
+        try:
+            pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+            await pool.enqueue_job("dispatch_action_job", action_id=str(action.id))
+            await pool.close()
+        except Exception as e:
+            import structlog
+            logger = structlog.get_logger(__name__)
+            logger.error("pipeline.enqueue_action.failed", action_id=str(action.id), error=str(e))
+            # Safe to ignore; the recovery_worker cron job will pick up any PENDING actions automatically.
