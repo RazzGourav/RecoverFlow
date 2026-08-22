@@ -7,6 +7,7 @@ Why this exists:
   ranks candidates, evaluates policies, and saves the final Action and AuditEvent.
 """
 
+import structlog
 from datetime import datetime, timezone
 from typing import Any
 
@@ -55,6 +56,8 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase, force
     """
     Executes the decision logic for a RecoveryCase.
     """
+    structlog.contextvars.bind_contextvars(case_id=str(case.id), model_version="v0.1.0-alpha")
+    
     case.status = CaseStatus.ANALYZING
     await session.flush()
     

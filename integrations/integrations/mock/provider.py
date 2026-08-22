@@ -26,6 +26,10 @@ class MockProvider(PaymentProvider):
         reference_id: str,
         expire_by: int | None = None,
     ) -> str:
+        import asyncio
+        if "timeout" in customer_details.get("name", "").lower():
+            await asyncio.sleep(20)
+            
         # Simulate payment link creation
         mock_id = f"plink_mock_{uuid.uuid4().hex[:8]}"
         return mock_id

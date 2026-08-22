@@ -20,7 +20,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
-from db.models import PaymentEvent, PaymentEventStatus
+from db.models import PaymentEvent, PaymentEventStatus, AuditEvent, AuditEventType
 from dependencies.db import get_db
 
 logger = structlog.get_logger(__name__)
@@ -123,6 +123,15 @@ async def razorpay_webhook(
         # Idempotency constraint hit (external_event_id is unique)
         await db.rollback()
         logger.info("webhook.duplicate_ignored", external_event_id=event_id)
+        
+        # Log to AuditEvents for Failure Center visibility
+        audit = AuditEvent(
+            event_type=AuditEventType.WEBHOOK_DUPLICATE_DROPPED,
+            context={"external_event_id": event_id, "event_type": event_type}
+        )
+        db.add(audit)
+        await db.commit()
+        
         return JSONResponse(status_code=status.HTTP_200_OK, content={"status": "duplicate"})
 
     # 6. Enqueue normalization job to ARQ (FR-005)

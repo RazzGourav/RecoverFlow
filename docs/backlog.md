@@ -154,3 +154,35 @@ Format: | Item | Reason | Target Phase | GitHub Issue |
 **Next session read first:**
 - You are ready for Phase 11 (Simulation Lab) or Phase 12 (Failure Center).
 - Ensure `docker compose up --build -d` runs successfully on your machine.
+
+### Session Summary: Phase 11 & 11.5 (Simulation Lab & Event Replay)
+**What was done:**
+- Built `ai/evaluation/simulation_core.py` to dry-run cases through the Phase 3 (inference) -> Phase 6 (risk) -> Phase 4 (policy) -> Phase 7.5 (validation) -> Phase 7 (execution) pipeline without financial side-effects.
+- Mocked SQLAlchemy `commit` and `rollback` on the `AsyncSession` during the simulation loop to preserve the isolated nested transaction while allowing internal execution state transitions (e.g., PENDING -> EXECUTING -> EXECUTED).
+- Built `POST /simulate/replay/{case_id}` (Event Replay Lab) for counterfactual analysis of single cases (e.g., "What if we offered a 10% discount?").
+- Forced `AuthorizationStatus.APPROVED` in the simulation scope to execute otherwise blocked actions.
+- Documented a hero case in `docs/demo/event_replay_demo.md`.
+- Wrote and passed comprehensive tests (`test_replay_endpoint.py`) confirming zero-writes safety.
+- Updated README.md status.
+
+**What's still open:**
+- Docker Desktop pipeline continues to be blocked on host communication, so `smoke_test.sh` via Docker is pending CI implementation.
+
+**Next session read first:**
+- Review Phase 12 (Failure Center) requirements in PRD.
+
+### Session Summary: Phase 12 (Failure Center)
+**What was done:**
+- Implemented `structlog.contextvars` in FastAPI middleware and backend modules for global request tracing (`correlation_id`, `case_id`, `action_id`).
+- Added new failure events to `AuditEventType` via an Alembic migration (`WEBHOOK_DUPLICATE_DROPPED`, `ACTION_TIMEOUT`, `VALIDATION_BLOCKED`, `RECONCILIATION_EXCEPTION`, `BUDGET_EXHAUSTED`).
+- Created `demo_failure_scenarios.sh` to inject these failures deterministically into the running API.
+- Wrote the `docs/demo/2am-incident.md` incident scenario and its accompanying integration test (`tests/integration/test_2am_incident.py`).
+- Built the `GET /audit/failures` endpoint and the `app/failures/page.tsx` Failure Center UI to display the timeline.
+- Updated `README.md` to reflect Phase 12 completion.
+
+**What's still open:**
+- Docker Desktop pipeline continues to be blocked on host communication, so `smoke_test.sh` via Docker is pending CI implementation.
+
+**Next session read first:**
+- You are ready for Phase 13 (Product Polish).
+- Ensure `docker compose up --build -d` runs successfully on your machine.
