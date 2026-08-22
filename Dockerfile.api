@@ -19,12 +19,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY apps/api/ .
 COPY integrations/ ./integrations/
 COPY domain/ ./domain/
+COPY ai/ ./ai/
 
 # Create a non-root user for the running process.
 # Why: Running as root inside a container is a security anti-pattern.
 RUN useradd -r -u 1001 -g root recoverflow \
     && chown -R recoverflow:root /app
 USER recoverflow
+
+
 
 # Expose the uvicorn port
 EXPOSE 8000

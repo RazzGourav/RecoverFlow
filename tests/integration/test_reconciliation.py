@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 
 from apps.api.db.models import Action, ActionType, AuthorizationStatus, ExecutionStatus, ReconciliationStatus, ReconciliationRecord
 from domain.finance.reconciliation import reconcile_action
-from integrations.mock.provider import MockProvider
+from integrations.integrations.mock.provider import MockProvider
 
 
 @pytest.fixture
