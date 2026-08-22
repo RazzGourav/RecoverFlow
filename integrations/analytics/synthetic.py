@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 try:
     from db.models import Session, FunnelEvent, FunnelEventType
 except ImportError:
-    from apps.api.db.models import Session, FunnelEvent, FunnelEventType
+    from db.models import Session, FunnelEvent, FunnelEventType
 from integrations.analytics.base import EventTrackingProvider, FunnelSummaryNode
 
 logger = structlog.get_logger(__name__)

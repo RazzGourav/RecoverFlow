@@ -3,7 +3,7 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock
 
-from integrations.mock.provider import MockProvider
+from integrations.integrations.mock.provider import MockProvider
 from sqlalchemy import select
 
 from apps.api.db.models import (

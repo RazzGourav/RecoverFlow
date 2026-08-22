@@ -229,7 +229,7 @@ make smoke       # Run smoke tests
 | 9 | Funnel Infrastructure | ✅ Done | |
 | 9.5 | Revenue Leak Graph | ✅ Done | Full funnel visualization with drill-through |
 | 10 | Dashboard | ✅ Done | Control tower, Cases, Intelligence, Policy Studio, Audit |
-| 11 | Simulation Lab | ✅ Done | |
+| 11 | Simulation Lab | ✅ Done | Batch & Event Replay simulation core |
 | 12 | Failure Center | ✅ Done | Dashboard for blocked, dropped, and failed cases |
 | 13 | Product Polish | ✅ Done | |
 | 14 | Evaluation Freeze | 🔲 Upcoming | |

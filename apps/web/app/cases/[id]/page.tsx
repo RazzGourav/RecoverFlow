@@ -51,9 +51,18 @@ export default async function CaseIntelligencePage({ params }: { params: { id: s
               <span className="text-white/40 text-sm">Created {new Date(caseData.created_at).toLocaleString()}</span>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-3xl font-bold text-[#06b6d4]">₹{(caseData.amount_paise / 100).toLocaleString()}</div>
-            <div className="text-white/50 text-sm uppercase tracking-wider">{caseData.failure_type}</div>
+          <div className="text-right flex flex-col items-end gap-2">
+            <div>
+              <div className="text-3xl font-bold text-[#06b6d4]">₹{(caseData.amount_paise / 100).toLocaleString()}</div>
+              <div className="text-white/50 text-sm uppercase tracking-wider">{caseData.failure_type}</div>
+            </div>
+            <Link 
+              href={`/cases/${caseData.id}/replay`}
+              className="mt-2 text-xs font-medium px-4 py-1.5 bg-[#06b6d4]/20 text-[#06b6d4] rounded-lg hover:bg-[#06b6d4]/30 transition-colors flex items-center gap-2 border border-[#06b6d4]/30"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Run in Replay Lab
+            </Link>
           </div>
         </header>
 

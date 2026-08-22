@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.api.db.models import RecoveryCase, Action, ActionType, ExecutionStatus
+from db.models import RecoveryCase, Action, ActionType, ExecutionStatus, AuthorizationStatus
 from domain.policies.pipeline import run_decision_pipeline
 from domain.finance.executor import execute_action
 from domain.recovery.budget_optimizer import optimize_budget, CandidateOptimizationInput
@@ -47,7 +47,7 @@ class SimulationResult(BaseModel):
     cases_processed: int
 
 async def _mock_validation(*args, **kwargs):
-    from integrations.validation import ValidationOutcome, ValidationStatus
+    from integrations.integrations.validation import ValidationOutcome, ValidationStatus
     return ValidationOutcome(status=ValidationStatus.VALID, reason="Simulation Override")
 
 async def simulate_strategy_batch(
@@ -73,6 +73,18 @@ async def simulate_strategy_batch(
     cases_processed = 0
 
     # Ensure zero side-effects via a nested transaction that rolls back at the end.
+    original_commit = session.commit
+    original_rollback = session.rollback
+    
+    async def mock_commit():
+        await session.flush()
+        
+    async def mock_rollback():
+        pass
+        
+    session.commit = mock_commit
+    session.rollback = mock_rollback
+
     async with session.begin_nested() as nested:
         try:
             # 1. Fetch cases
@@ -126,9 +138,8 @@ async def simulate_strategy_batch(
                 funded_cases = {uuid.UUID(a.case_id) for a in allocations if a.funded}
 
             # 2. Prevent ARQ job enqueueing and Mock External Calls
-            with patch("domain.policies.pipeline.create_pool"), \
-                 patch("domain.finance.executor.get_validator") as mock_get_val, \
-                 patch("domain.finance.executor.get_provider") as mock_get_prov:
+            with patch("integrations.integrations.factory.get_validator") as mock_get_val, \
+                 patch("integrations.integrations.factory.get_provider") as mock_get_prov:
                  
                 # Mock the validator to always pass
                 mock_validator = mock_get_val.return_value
@@ -136,7 +147,7 @@ async def simulate_strategy_batch(
                 mock_validator.return_value.reason = "Simulation Passed"
                 
                 # We need the validator outcome to be exactly ValidationOutcome with status VALID
-                from integrations.validation import ValidationOutcome, ValidationStatus
+                from integrations.integrations.validation import ValidationOutcome, ValidationStatus
                 mock_validator.return_value = ValidationOutcome(status=ValidationStatus.VALID, reason="Simulation")
 
                 # Mock provider to not actually hit Razorpay
@@ -170,6 +181,8 @@ async def simulate_strategy_batch(
                     action = action_res.scalar_one_or_none()
                     
                     if action and action.execution_status == ExecutionStatus.PENDING:
+                        # Force approval in simulation so it can be executed
+                        action.authorization_status = AuthorizationStatus.APPROVED
                         # Execute Action (Phase 7.5 Validation + Phase 7 Execution)
                         # We execute in the same session, which handles internal states securely.
                         action = await execute_action(session, action.id)
@@ -177,7 +190,7 @@ async def simulate_strategy_batch(
                     # Calculate Expected Value resulting from the ACTUAL action that made it through
                     if action and action.execution_status == ExecutionStatus.EXECUTED and action.action_type != ActionType.NO_ACTION:
                         # Fetch the candidate action to get the expected probability
-                        from apps.api.db.models import CandidateAction
+                        from db.models import CandidateAction
                         cand_stmt = select(CandidateAction).where(
                             CandidateAction.case_id == case.id, 
                             CandidateAction.action_type == action.action_type
@@ -195,6 +208,10 @@ async def simulate_strategy_batch(
                     cases_processed += 1
                     
         finally:
+            # Restore original methods
+            session.commit = original_commit
+            session.rollback = original_rollback
+            
             # ZERO writes guarantee: Rollback everything before exiting.
             await nested.rollback()
             
