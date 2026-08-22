@@ -16,6 +16,8 @@ from sqlalchemy.orm import joinedload
 from apps.api.db.models import (
     Action,
     ActionType,
+    AuditEvent,
+    AuditEventType,
     ExecutionStatus,
     ReconciliationRecord,
     ReconciliationStatus,
@@ -48,6 +50,8 @@ async def reconcile_action(session: AsyncSession, action_id: uuid.UUID) -> Recon
     
     if not action:
         raise ValueError(f"Action {action_id} not found.")
+        
+    structlog.contextvars.bind_contextvars(action_id=str(action_id), case_id=str(action.case_id))
         
     if action.execution_status not in (ExecutionStatus.EXECUTED, ExecutionStatus.VERIFIED):
         raise ValueError(f"Cannot reconcile action in state: {action.execution_status}")
@@ -121,6 +125,14 @@ async def reconcile_action(session: AsyncSession, action_id: uuid.UUID) -> Recon
     else:
         record.status = ReconciliationStatus.EXCEPTION
         record.exception_reason = f"Reconciliation not implemented for action type: {action.action_type}"
+
+    if record.status == ReconciliationStatus.EXCEPTION:
+        audit_evt = AuditEvent(
+            case_id=case.id,
+            event_type=AuditEventType.RECONCILIATION_EXCEPTION,
+            context={"action_id": str(action.id), "reason": record.exception_reason}
+        )
+        session.add(audit_evt)
 
     await session.commit()
     return record

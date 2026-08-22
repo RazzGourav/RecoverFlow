@@ -46,6 +46,7 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
         Exception: If the provider call fails (the action is marked FAILED).
     """
     # 1. Fetch action with related case and customer details
+    structlog.contextvars.bind_contextvars(action_id=str(action_id))
     stmt = (
         select(Action)
         .options(
@@ -60,6 +61,8 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
 
     if not action:
         raise ValueError(f"Action {action_id} not found.")
+        
+    structlog.contextvars.bind_contextvars(case_id=str(action.case_id))
 
     # 2. Guardrails: State machine checks & Idempotency
     if action.execution_status in (ExecutionStatus.EXECUTED, ExecutionStatus.VERIFIED):
@@ -120,7 +123,7 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
         
         event = AuditEvent(
             case_id=case.id,
-            event_type=AuditEventType.ACTION_EXECUTED, # Or RISK_FIREWALL_BLOCKED/similar if you add a new event type.
+            event_type=AuditEventType.VALIDATION_BLOCKED,
             reason=f"Action blocked by validation layer: {validation_outcome.reason}",
             actor="SYSTEM",
             metadata_payload={
@@ -217,7 +220,7 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
         
         event = AuditEvent(
             case_id=case.id,
-            event_type=AuditEventType.ACTION_EXECUTED,
+            event_type=AuditEventType.ACTION_TIMEOUT,
             reason=f"Execution timed out.",
             actor="SYSTEM",
             metadata_payload={

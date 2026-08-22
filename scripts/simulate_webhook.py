@@ -27,7 +27,7 @@ def generate_signature(payload: bytes, secret: str) -> str:
     return hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
 
 
-def get_payment_failed_payload() -> dict:
+def get_payment_failed_payload(customer_name: str = "Customer") -> dict:
     return {
         "entity": "event",
         "account_id": "acc_mock_123",
@@ -42,6 +42,10 @@ def get_payment_failed_payload() -> dict:
                     "currency": "INR",
                     "status": "failed",
                     "order_id": f"order_mock_{uuid.uuid4().hex[:8]}",
+                    "notes": {
+                        "customer_name": customer_name,
+                        "customer_email": "test@example.com"
+                    },
                     "invoice_id": None,
                     "international": False,
                     "method": "card",
@@ -69,10 +73,11 @@ def main():
     parser.add_argument("--secret", default=WEBHOOK_SECRET, help="Webhook secret")
     parser.add_argument("--event", choices=["payment.failed"], default="payment.failed", help="Event type to simulate")
     parser.add_argument("--id", help="Override the event ID (useful for testing idempotency)")
+    parser.add_argument("--customer-name", default="Customer", help="Set the customer name in notes")
     args = parser.parse_args()
 
     if args.event == "payment.failed":
-        payload = get_payment_failed_payload()
+        payload = get_payment_failed_payload(args.customer_name)
     else:
         print(f"Event {args.event} not implemented in simulator yet.")
         return
