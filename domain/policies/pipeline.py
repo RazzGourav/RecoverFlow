@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.features.engineer import ACTION_TYPES
 from ai.inference.predict import analyze_case
-from apps.api.db.models import (
+from db.models import (
     Action,
     ActionType,
     AuditEventType,

@@ -18,10 +18,13 @@ COPY apps/api/ .
 COPY integrations/ ./integrations/
 COPY workers/ ./workers/
 COPY domain/ ./domain/
+COPY ai/ ./ai/
 
 RUN useradd -r -u 1001 -g root recoverflow \
     && chown -R recoverflow:root /app
 USER recoverflow
+
+
 
 # Workers do not expose HTTP ports.
 CMD ["arq", "workers.event_worker.worker.WorkerSettings"]

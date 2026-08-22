@@ -27,7 +27,7 @@ async def generate_explanation(
     Implements a circuit breaker (timeout) and a fallback to OpenAI if Gemini fails.
     Returns the parsed ExplanationResult.
     """
-    from apps.api.config import settings
+    from config import settings
     if settings.llm_provider == "mock":
         return ExplanationResult(
             narrative="Mocked explanation for testing.",
