@@ -2,24 +2,23 @@
 RecoverFlow API — Budget Optimizer Routes
 """
 
-from fastapi import APIRouter, Query
-from pydantic import BaseModel
-from typing import List
 
 from domain.recovery.budget_optimizer import (
-    optimize_budget, 
-    CandidateOptimizationInput, 
-    AllocationResult
+    AllocationResult,
+    CandidateOptimizationInput,
+    optimize_budget,
 )
+from fastapi import APIRouter, Query
+from pydantic import BaseModel
 
 router = APIRouter()
 
 class BudgetOptimizeRequest(BaseModel):
-    candidates: List[CandidateOptimizationInput]
+    candidates: list[CandidateOptimizationInput]
 
 
 class BudgetOptimizeResponse(BaseModel):
-    allocations: List[AllocationResult]
+    allocations: list[AllocationResult]
 
 
 @router.post("/optimize", response_model=BudgetOptimizeResponse)

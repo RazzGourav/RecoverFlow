@@ -56,6 +56,7 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase, force
     """
     Executes the decision logic for a RecoveryCase.
     """
+    import structlog
     structlog.contextvars.bind_contextvars(case_id=str(case.id), model_version="v0.1.0-alpha")
     
     case.status = CaseStatus.ANALYZING

@@ -8,7 +8,7 @@ Why this file exists:
 from __future__ import annotations
 
 from db.models import ActionType
-from integrations.integrations.validation import ValidationOutcome, ValidationStatus
+from integrations.validation import ValidationOutcome, ValidationStatus
 
 
 def validate_action_against_live_state(action_type: ActionType, live_payment_state: dict) -> ValidationOutcome:

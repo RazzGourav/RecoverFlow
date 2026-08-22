@@ -6,26 +6,36 @@ payment stage (live system data), with root-cause drill-through at each
 leak point.
 """
 
-from typing import List, Optional
-from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Query
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from sqlalchemy import Integer, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, case as sql_case, Integer
 
 from dependencies.db import get_db
 
 try:
     from db.models import (
-        FunnelEvent, FunnelEventType, PaymentEvent,
-        RecoveryCase, CandidateAction, ReconciliationRecord,
-        ReconciliationStatus, CaseStatus, ActionType, Customer
+        ActionType,
+        CandidateAction,
+        CaseStatus,
+        Customer,
+        FunnelEvent,
+        FunnelEventType,
+        PaymentEvent,
+        ReconciliationRecord,
+        ReconciliationStatus,
+        RecoveryCase,
     )
 except ImportError:
     from apps.api.db.models import (
-        FunnelEvent, FunnelEventType, PaymentEvent,
-        RecoveryCase, CandidateAction, ReconciliationRecord,
-        ReconciliationStatus, CaseStatus, ActionType, Customer
+        CandidateAction,
+        Customer,
+        FunnelEvent,
+        FunnelEventType,
+        PaymentEvent,
+        RecoveryCase,
     )
 
 router = APIRouter()
@@ -58,9 +68,9 @@ class LeakPoint(BaseModel):
     to_stage: str
     lost_count: int
     lost_value_paise: int
-    root_causes: List[RootCauseBreakdown]
-    affected_segments: List[SegmentBreakdown]
-    recovery_actions: List[RecoveryActionSummary]
+    root_causes: list[RootCauseBreakdown]
+    affected_segments: list[SegmentBreakdown]
+    recovery_actions: list[RecoveryActionSummary]
 
 
 class FunnelStage(BaseModel):
@@ -71,8 +81,8 @@ class FunnelStage(BaseModel):
 
 
 class LeakGraphResponse(BaseModel):
-    stages: List[FunnelStage]
-    leaks: List[LeakPoint]
+    stages: list[FunnelStage]
+    leaks: list[LeakPoint]
     generated_at: str
     note: str = (
         "Top-of-funnel stages (SITE_VISIT through CHECKOUT_STARTED) use "
@@ -126,7 +136,7 @@ async def get_leak_graph(db: AsyncSession = Depends(get_db)):
         FunnelEventType.CHECKOUT_STARTED,
     ]
 
-    stages: List[FunnelStage] = []
+    stages: list[FunnelStage] = []
     for s in simulated_stages:
         stats = funnel_stats.get(s, {"count": 0, "value": 0})
         stages.append(FunnelStage(
@@ -154,10 +164,10 @@ async def get_leak_graph(db: AsyncSession = Depends(get_db)):
     ))
 
     # 3. Build leak points
-    leaks: List[LeakPoint] = []
+    leaks: list[LeakPoint] = []
 
     # Consecutive stage pairs
-    stage_pairs = list(zip(stages[:-1], stages[1:]))
+    stage_pairs = list(zip(stages[:-1], stages[1:], strict=False))
     for from_stage, to_stage in stage_pairs:
         lost_count = max(0, from_stage.count - to_stage.count)
         lost_value = max(0, from_stage.value_paise - to_stage.value_paise)
@@ -174,9 +184,9 @@ async def get_leak_graph(db: AsyncSession = Depends(get_db)):
             ))
             continue
 
-        root_causes: List[RootCauseBreakdown] = []
-        affected_segments: List[SegmentBreakdown] = []
-        recovery_actions: List[RecoveryActionSummary] = []
+        root_causes: list[RootCauseBreakdown] = []
+        affected_segments: list[SegmentBreakdown] = []
+        recovery_actions: list[RecoveryActionSummary] = []
 
         # Only payment-stage leaks have recovery_cases data for drill-through
         if from_stage.stage in ("PAYMENT_ATTEMPTED", "CHECKOUT_STARTED"):
@@ -192,7 +202,7 @@ async def get_leak_graph(db: AsyncSession = Depends(get_db)):
             ).where(
                 FunnelEvent.event_type == FunnelEventType.PAYMENT_ATTEMPTED
             ).group_by(RecoveryCase.failure_type)
-            
+
             rc_result = await db.execute(rc_stmt)
             for row in rc_result.all():
                 root_causes.append(RootCauseBreakdown(
@@ -214,7 +224,7 @@ async def get_leak_graph(db: AsyncSession = Depends(get_db)):
             ).where(
                 FunnelEvent.event_type == FunnelEventType.PAYMENT_ATTEMPTED
             ).group_by(Customer.segment)
-            
+
             seg_result = await db.execute(seg_stmt)
             for row in seg_result.all():
                 affected_segments.append(SegmentBreakdown(
@@ -236,7 +246,7 @@ async def get_leak_graph(db: AsyncSession = Depends(get_db)):
             ).where(
                 FunnelEvent.event_type == FunnelEventType.PAYMENT_ATTEMPTED
             ).group_by(CandidateAction.action_type)
-            
+
             ra_result = await db.execute(ra_stmt)
             for row in ra_result.all():
                 recovery_actions.append(RecoveryActionSummary(
@@ -258,5 +268,5 @@ async def get_leak_graph(db: AsyncSession = Depends(get_db)):
     return LeakGraphResponse(
         stages=stages,
         leaks=leaks,
-        generated_at=datetime.now(timezone.utc).isoformat()
+        generated_at=datetime.now(UTC).isoformat()
     )

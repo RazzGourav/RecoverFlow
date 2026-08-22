@@ -5,7 +5,7 @@ def fix_imports_in_file(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:
         content = f.read()
         
-    # Replace "from integrations.X" with "from integrations.integrations.X"
+    # Replace "from integrations.X" with "from integrations.X"
     # ONLY if X is in [factory, validation, base, mock, razorpay, provider]
     
     modules = ['factory', 'validation', 'base', 'mock', 'razorpay', 'provider']
@@ -13,12 +13,12 @@ def fix_imports_in_file(filepath):
     new_content = content
     for m in modules:
         # Match 'from integrations.m' or 'import integrations.m'
-        # Do not match 'integrations.analytics' or 'integrations.integrations'
+        # Do not match 'integrations.analytics' or 'integrations'
         
         # from integrations.m
-        new_content = re.sub(rf"from integrations\.{m}\b", f"from integrations.integrations.{m}", new_content)
+        new_content = re.sub(rf"from integrations\.{m}\b", f"from integrations.{m}", new_content)
         # import integrations.m
-        new_content = re.sub(rf"import integrations\.{m}\b", f"import integrations.integrations.{m}", new_content)
+        new_content = re.sub(rf"import integrations\.{m}\b", f"import integrations.{m}", new_content)
 
     if content != new_content:
         with open(filepath, 'w', encoding='utf-8') as f:

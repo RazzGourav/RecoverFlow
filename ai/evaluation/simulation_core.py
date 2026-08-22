@@ -7,7 +7,7 @@ and forcing a rollback.
 """
 import uuid
 import structlog
-from typing import List, Optional
+from typing import List
 from unittest.mock import patch
 from pydantic import BaseModel
 
@@ -47,7 +47,7 @@ class SimulationResult(BaseModel):
     cases_processed: int
 
 async def _mock_validation(*args, **kwargs):
-    from integrations.integrations.validation import ValidationOutcome, ValidationStatus
+    from integrations.validation import ValidationOutcome, ValidationStatus
     return ValidationOutcome(status=ValidationStatus.VALID, reason="Simulation Override")
 
 async def simulate_strategy_batch(
@@ -138,8 +138,8 @@ async def simulate_strategy_batch(
                 funded_cases = {uuid.UUID(a.case_id) for a in allocations if a.funded}
 
             # 2. Prevent ARQ job enqueueing and Mock External Calls
-            with patch("integrations.integrations.factory.get_validator") as mock_get_val, \
-                 patch("integrations.integrations.factory.get_provider") as mock_get_prov:
+            with patch("integrations.factory.get_validator") as mock_get_val, \
+                 patch("integrations.factory.get_provider") as mock_get_prov:
                  
                 # Mock the validator to always pass
                 mock_validator = mock_get_val.return_value
@@ -147,7 +147,7 @@ async def simulate_strategy_batch(
                 mock_validator.return_value.reason = "Simulation Passed"
                 
                 # We need the validator outcome to be exactly ValidationOutcome with status VALID
-                from integrations.integrations.validation import ValidationOutcome, ValidationStatus
+                from integrations.validation import ValidationOutcome, ValidationStatus
                 mock_validator.return_value = ValidationOutcome(status=ValidationStatus.VALID, reason="Simulation")
 
                 # Mock provider to not actually hit Razorpay

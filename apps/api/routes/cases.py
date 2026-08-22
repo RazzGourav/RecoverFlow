@@ -1,14 +1,13 @@
 import uuid
-from typing import Optional, List
+
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from db.models import Action, AuthorizationStatus, Customer, ExecutionStatus, RecoveryCase
 from dependencies.db import get_db
-from db.models import Action, AuthorizationStatus, ExecutionStatus, RecoveryCase, Customer
-
-from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -25,16 +24,16 @@ async def approve_action(action_id: uuid.UUID, request: Request, db: AsyncSessio
     stmt = select(Action).where(Action.id == action_id).with_for_update()
     result = await db.execute(stmt)
     action = result.scalar_one_or_none()
-    
+
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
-        
+
     if action.authorization_status != AuthorizationStatus.AWAITING_HUMAN:
         raise HTTPException(status_code=400, detail=f"Action is not awaiting human approval (current status: {action.authorization_status})")
-        
+
     action.authorization_status = AuthorizationStatus.APPROVED
     await db.commit()
-    
+
     # Enqueue execution
     pool = getattr(request.app.state, "arq_pool", None)
     if pool:
@@ -43,6 +42,7 @@ async def approve_action(action_id: uuid.UUID, request: Request, db: AsyncSessio
         # Fallback to creating a one-off connection
         from arq import create_pool
         from arq.connections import RedisSettings
+
         from config import settings
         try:
             pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
@@ -50,7 +50,7 @@ async def approve_action(action_id: uuid.UUID, request: Request, db: AsyncSessio
             await pool.close()
         except Exception:
             pass # The cron fallback will pick it up
-            
+
     return ApprovalResponse(status="approved", action_id=str(action.id))
 
 
@@ -62,26 +62,26 @@ async def reject_action(action_id: uuid.UUID, db: AsyncSession = Depends(get_db)
     stmt = select(Action).where(Action.id == action_id).with_for_update()
     result = await db.execute(stmt)
     action = result.scalar_one_or_none()
-    
+
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
-        
+
     if action.authorization_status != AuthorizationStatus.AWAITING_HUMAN:
         raise HTTPException(status_code=400, detail=f"Action is not awaiting human approval (current status: {action.authorization_status})")
-        
+
     action.authorization_status = AuthorizationStatus.BLOCKED
     action.execution_status = ExecutionStatus.CANCELLED
     await db.commit()
-    
+
     return ApprovalResponse(status="rejected", action_id=str(action.id))
 
 
-@router.get("/", response_model=List[dict])
+@router.get("/", response_model=list[dict])
 async def list_cases(
-    status: Optional[str] = None,
-    segment: Optional[str] = None,
-    risk_level: Optional[str] = None,
-    authorization_status: Optional[str] = None,
+    status: str | None = None,
+    segment: str | None = None,
+    risk_level: str | None = None,
+    authorization_status: str | None = None,
     db: AsyncSession = Depends(get_db)
 ):
     stmt = select(RecoveryCase).options(selectinload(RecoveryCase.customer))
@@ -89,17 +89,17 @@ async def list_cases(
         stmt = stmt.where(RecoveryCase.status == status)
     if risk_level:
         stmt = stmt.where(RecoveryCase.risk_level == risk_level)
-    
+
     if segment:
         stmt = stmt.join(Customer).where(Customer.segment == segment)
-        
+
     stmt = stmt.order_by(RecoveryCase.created_at.desc()).limit(100)
     result = await db.execute(stmt)
     cases = result.scalars().all()
-    
+
     # Filter by authorization_status if provided (requires inspecting the active action, for now we just do it in python)
     # A better way would be to join Action table, but let's keep it simple for now.
-    
+
     res = []
     for c in cases:
         res.append({
@@ -123,12 +123,12 @@ async def get_case(case_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         selectinload(RecoveryCase.actions),
         selectinload(RecoveryCase.audit_events)
     ).where(RecoveryCase.id == case_id)
-    
+
     result = await db.execute(stmt)
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(404, "Case not found")
-        
+
     return {
         "id": str(c.id),
         "status": c.status.value if hasattr(c.status, 'value') else c.status,

@@ -1,20 +1,24 @@
 import uuid
-from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
-from datetime import datetime
+from typing import Any
 
+from ai.evaluation.simulation_core import SimulationResult, simulate_strategy_batch
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from db.models import (
+    CaseStatus,
+    FunnelEvent,
+    RecoveryCase,
+)
 from dependencies.db import get_db
-from db.models import RecoveryCase, CaseStatus, Action, CandidateAction, AuditEvent, FunnelEvent, PaymentEvent
-from ai.evaluation.simulation_core import simulate_strategy_batch, SimulationResult
 
 router = APIRouter(prefix="/simulate", tags=["simulation"])
 
 class SimulationCompareRequest(BaseModel):
-    case_ids: Optional[List[uuid.UUID]] = None
+    case_ids: list[uuid.UUID] | None = None
     sample_size: int = 100
     budget_paise: int = 500000  # Default 5,000 INR
 
@@ -22,7 +26,7 @@ class StrategyComparisonResult(SimulationResult):
     vs_optimal_paise: int
 
 class SimulationCompareResponse(BaseModel):
-    results: List[StrategyComparisonResult]
+    results: list[StrategyComparisonResult]
 
 @router.post("/compare", response_model=SimulationCompareResponse)
 async def compare_strategies(
@@ -52,7 +56,7 @@ async def compare_strategies(
     ]
 
     sim_results = []
-    
+
     # We must run these sequentially or in a way that respects the DB connection/transaction.
     # Since they use nested transactions on the same session, sequential is safest.
     for strategy in strategies:
@@ -67,11 +71,11 @@ async def compare_strategies(
         except Exception as e:
             import traceback
             traceback.print_exc()
-            raise HTTPException(status_code=500, detail=f"Simulation failed for strategy {strategy}: {str(e)}")
-            
+            raise HTTPException(status_code=500, detail=f"Simulation failed for strategy {strategy}: {e!s}")
+
     # Find OPTIMAL net recovery for comparison
     optimal_net = next((r.net_recovery_paise for r in sim_results if r.strategy == "RECOVERFLOW_OPTIMAL"), 0)
-    
+
     final_results = []
     for r in sim_results:
         final_results.append(
@@ -84,7 +88,7 @@ async def compare_strategies(
                 vs_optimal_paise=r.net_recovery_paise - optimal_net
             )
         )
-        
+
     return SimulationCompareResponse(results=final_results)
 
 
@@ -98,7 +102,7 @@ class TimelineEvent(BaseModel):
     type: str
     description: str
     timestamp: str
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
 class MetricSnapshot(BaseModel):
     expected_recovery_paise: int
@@ -107,7 +111,7 @@ class MetricSnapshot(BaseModel):
     action_type: str
 
 class ReplayResponse(BaseModel):
-    timeline: List[TimelineEvent]
+    timeline: list[TimelineEvent]
     before: MetricSnapshot
     after: MetricSnapshot
 
@@ -127,16 +131,16 @@ async def replay_case(
         selectinload(RecoveryCase.audit_events),
         selectinload(RecoveryCase.candidate_actions)
     ).where(RecoveryCase.id == case_id)
-    
+
     result = await session.execute(stmt)
     case = result.scalar_one_or_none()
-    
+
     if not case:
         raise HTTPException(404, "Case not found")
 
     # 2. Build Timeline
-    timeline: List[TimelineEvent] = []
-    
+    timeline: list[TimelineEvent] = []
+
     # 2a. Funnel Events (if session_id exists)
     if case.payment_event and case.payment_event.session_id:
         f_stmt = select(FunnelEvent).where(FunnelEvent.session_id == case.payment_event.session_id).order_by(FunnelEvent.timestamp)
@@ -169,7 +173,7 @@ async def replay_case(
             timestamp=ae.timestamp.isoformat(),
             metadata={"decision": ae.decision, "reason": ae.reason}
         ))
-        
+
     for a in sorted(case.actions, key=lambda x: x.created_at):
         timeline.append(TimelineEvent(
             id=str(a.id),
@@ -186,13 +190,13 @@ async def replay_case(
     before_action_type = "NO_ACTION"
     before_cost = 0
     before_ev = 0
-    
+
     # Get the latest executed action
     executed_actions = [a for a in case.actions if a.execution_status.value == "EXECUTED"] if case.actions else []
     if executed_actions:
         latest_action = sorted(executed_actions, key=lambda x: x.created_at, reverse=True)[0]
         before_action_type = latest_action.action_type.value if hasattr(latest_action.action_type, 'value') else latest_action.action_type
-        
+
         # Find expected value from candidate actions
         cand = next((ca for ca in case.candidate_actions if (ca.action_type.value if hasattr(ca.action_type, 'value') else ca.action_type) == before_action_type), None)
         if cand:
@@ -213,14 +217,14 @@ async def replay_case(
         strategy=request.strategy,
         budget_paise=500000
     )
-    
+
     # We need the action type chosen by the simulation.
     # The simulation returns totals, but we need the specific action for the timeline/UI.
     # We can infer it or we can change simulate_strategy_batch to return it.
     # For a single case, we can deduce it if it's not NO_ACTION, but let's just show the net stats.
     # Actually, we should know what action was chosen.
     # Let's peek into the nested transaction? No, it rolls back.
-    # For now, we will return the strategy name as action_type if expected_recovery > 0, 
+    # For now, we will return the strategy name as action_type if expected_recovery > 0,
     # or if force_action was used, we know what it was.
     after_action_type = request.strategy
     if after_res.expected_recovery_paise == 0:

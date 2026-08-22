@@ -1,6 +1,5 @@
 import pytest
 import pytest_asyncio
-import uuid
 from httpx import ASGITransport, AsyncClient
 
 from sqlalchemy import select, func

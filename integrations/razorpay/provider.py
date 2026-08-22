@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 import razorpay
 from config import settings
 
-from integrations.integrations.base import PaymentProvider
+from integrations.base import PaymentProvider
 
 
 class RazorpayProvider(PaymentProvider):

@@ -1,5 +1,4 @@
 import os
-import glob
 
 def fix_imports_in_file(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:

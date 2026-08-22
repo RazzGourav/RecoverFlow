@@ -1,13 +1,12 @@
 import pytest
 import pytest_asyncio
-import uuid
 from httpx import ASGITransport, AsyncClient
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from apps.api.db.models import Action, AuditEvent, ExecutionStatus, RecoveryCase, CaseStatus
+from apps.api.db.models import Action, AuditEvent, RecoveryCase, CaseStatus
 
 TEST_DATABASE_URL = "postgresql+asyncpg://recoverflow:recoverflow@localhost:5432/recoverflow"
 

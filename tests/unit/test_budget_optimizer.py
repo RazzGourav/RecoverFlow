@@ -1,4 +1,3 @@
-import pytest
 from domain.recovery.budget_optimizer import optimize_budget, CandidateOptimizationInput
 
 def test_optimize_budget_greedy_allocation():

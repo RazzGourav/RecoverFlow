@@ -186,7 +186,7 @@ class ReconciliationStatus(str, enum.Enum):
 
 class FunnelEventType(str, enum.Enum):
     """Stages of the synthetic revenue funnel."""
-    
+
     SITE_VISIT = "SITE_VISIT"
     PRODUCT_VIEW = "PRODUCT_VIEW"
     ADD_TO_CART = "ADD_TO_CART"
@@ -732,7 +732,7 @@ class Session(Base):
     This data is predominantly syntheticly generated for demo purposes.
     """
     __tablename__ = "sessions"
-    
+
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
@@ -748,7 +748,7 @@ class Session(Base):
     )
     # Device, browser, channel metadata
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
-    
+
     events: Mapped[list[FunnelEvent]] = relationship(back_populates="session")
 
 
@@ -760,7 +760,7 @@ class FunnelEvent(Base):
     __table_args__ = (
         Index("ix_funnel_events_session_type", "session_id", "event_type"),
     )
-    
+
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
@@ -778,6 +778,6 @@ class FunnelEvent(Base):
     )
     product_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     cart_value_paise: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    
+
     session: Mapped[Session] = relationship(back_populates="events")
 

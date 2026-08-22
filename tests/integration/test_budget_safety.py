@@ -1,5 +1,4 @@
 import pytest
-import uuid
 
 from apps.api.db.models import ActionType, AuthorizationStatus
 from domain.recovery.budget_optimizer import optimize_budget, CandidateOptimizationInput

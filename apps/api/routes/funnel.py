@@ -3,15 +3,15 @@ RecoverFlow API — Funnel Ingestion & Aggregation
 """
 
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Any
+
 from fastapi import APIRouter, Depends
+from integrations.analytics.base import FunnelSummaryNode
+from integrations.analytics.synthetic import SyntheticProvider
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dependencies.db import get_db
-from integrations.analytics.synthetic import SyntheticProvider
-from integrations.analytics.base import FunnelSummaryNode
-
 
 router = APIRouter()
 
@@ -20,7 +20,7 @@ class TrackEventRequest(BaseModel):
     session_id: str
     event_type: str
     timestamp: datetime
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class TrackEventResponse(BaseModel):
@@ -29,7 +29,7 @@ class TrackEventResponse(BaseModel):
 
 
 class FunnelSummaryResponse(BaseModel):
-    nodes: List[FunnelSummaryNode]
+    nodes: list[FunnelSummaryNode]
     note: str = "Simulated traffic data: top-of-funnel events (visits/views/cart) are synthetically generated."
 
 

@@ -11,15 +11,13 @@ This script runs against the local DB, generates deterministic sessions, and exp
 the final PAYMENT_ATTEMPTED stage back to existing `payment_events` rows to bridge the datasets.
 """
 
-import sys
 import uuid
 import random
 import asyncio
 from datetime import datetime, timedelta, timezone
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from db.session import get_db, async_session_maker
+from db.session import async_session_maker
 from db.models import Session, FunnelEvent, FunnelEventType, PaymentEvent
 
 SEED = 42

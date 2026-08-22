@@ -5,7 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from apps.api.db.models import AuditEvent, AuditEventType, RecoveryCase, Action, ActionType, ExecutionStatus
-from apps.api.main import create_app
 
 # This test requires the application to be fully running (or we can use httpx.AsyncClient)
 # For simplicity in this demo, we test the endpoints locally assuming the test DB is configured.
@@ -54,7 +53,6 @@ async def test_webhook_duplicate(async_client: httpx.AsyncClient, db_session: As
 @pytest.mark.asyncio
 async def test_action_timeout(db_session: AsyncSession):
     """Test Defense 2: Action Timeout"""
-    from domain.finance.executor import execute_action
     
     # Create mock case
     case = RecoveryCase(

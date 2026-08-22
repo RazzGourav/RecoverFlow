@@ -21,9 +21,8 @@ from db.models import (
     ExecutionStatus,
     ReconciliationRecord,
     ReconciliationStatus,
-    RecoveryCase,
 )
-from integrations.integrations.factory import get_provider
+from integrations.factory import get_provider
 
 logger = structlog.get_logger(__name__)
 

@@ -11,12 +11,12 @@ Why this file exists:
 
 from __future__ import annotations
 
+import uuid
 from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-import uuid
 
 from config import settings
 from routes.health import router as health_router

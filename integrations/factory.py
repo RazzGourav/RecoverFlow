@@ -8,7 +8,7 @@ Why this file exists:
 
 from config import settings
 
-from integrations.integrations.base import PaymentProvider
+from integrations.base import PaymentProvider
 
 
 def get_provider() -> PaymentProvider:
@@ -16,10 +16,10 @@ def get_provider() -> PaymentProvider:
     Returns the configured PaymentProvider instance.
     """
     if settings.payment_provider.lower() == "razorpay":
-        from integrations.integrations.razorpay.provider import RazorpayProvider
+        from integrations.razorpay.provider import RazorpayProvider
         return RazorpayProvider()
     elif settings.payment_provider.lower() == "mock":
-        from integrations.integrations.mock.provider import MockProvider
+        from integrations.mock.provider import MockProvider
         return MockProvider()
     else:
         raise ValueError(
@@ -32,10 +32,10 @@ def get_validator():
     Returns the appropriate validation function for the configured provider.
     """
     if settings.payment_provider.lower() == "razorpay":
-        from integrations.integrations.razorpay.validation import validate_action_against_live_state
+        from integrations.razorpay.validation import validate_action_against_live_state
         return validate_action_against_live_state
     elif settings.payment_provider.lower() == "mock":
-        from integrations.integrations.mock.validation import validate_action_against_live_state
+        from integrations.mock.validation import validate_action_against_live_state
         return validate_action_against_live_state
     else:
         raise ValueError(

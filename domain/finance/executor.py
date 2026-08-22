@@ -12,7 +12,7 @@ Why this file exists:
 import uuid
 
 import structlog
-from integrations.integrations.factory import get_provider
+from integrations.factory import get_provider
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -105,8 +105,8 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
         logger.warning("executor.live_state_fetch_failed", action_id=str(action.id), error=str(e))
         live_state = {}
 
-    from integrations.integrations.factory import get_validator
-    from integrations.integrations.validation import ValidationStatus
+    from integrations.factory import get_validator
+    from integrations.validation import ValidationStatus
     
     validator = get_validator()
     validation_outcome = validator(action.action_type, live_state)
@@ -204,7 +204,7 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
             provider_reference=action.provider_reference,
         )
 
-    except asyncio.TimeoutError as e:
+    except asyncio.TimeoutError:
         logger.error(
             "action_execution_timeout",
             action_id=str(action_id),
@@ -218,7 +218,7 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
         event = AuditEvent(
             case_id=case.id,
             event_type=AuditEventType.ACTION_TIMEOUT,
-            reason=f"Execution timed out.",
+            reason="Execution timed out.",
             context={
                 "action_id": str(action.id),
                 "action_type": action.action_type.value,
