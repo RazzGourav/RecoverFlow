@@ -3,7 +3,7 @@
 ## Overview
 RecoverFlow is an AI-powered revenue recovery control plane designed to intelligently intercept failed payments and orchestrate recovery strategies using machine learning, mitigating churn while respecting budget constraints. 
 
-## High-Level Architecture
+## End-to-End Architecture
 
 The system is composed of several decoupled layers:
 
@@ -15,15 +15,15 @@ The system is composed of several decoupled layers:
 
 ## Sub-Systems & Interactions
 
-- **Webhook Ingestion (Phase 1)**: Ingests `payment.failed` events. Uses idempotency keys to prevent duplicate processing.
-- **Funnel Infrastructure (Phase 9)**: Tracks the complete lifecycle of a recovery attempt (Ingested -> Scored -> Policy Executed -> Reconciled) for visibility via the Revenue Leak Graph.
-- **Risk Firewall (Phase 6)**: A rule-based + ML classifier that intercepts high-risk or unrecoverable cases (e.g., fraudulent accounts, persistent failures) before any money is spent on recovery.
-- **Decision Engine (Phase 4)**: Evaluates candidate actions using the ML models. If the system is unsure, it triggers an LLM fallback (Phase 5) to dynamically reason about complex edge cases.
-- **Budget Optimizer (Phase 8.5)**: Formulates recovery as a Knapsack problem, selecting the optimal combination of recovery actions across a batch of cases to maximize Expected Value (EV) under a strict monthly budget cap.
-- **Validation & Reconciliation (Phase 7.5 & 8)**: 
+- **Webhook Ingestion**: Ingests `payment.failed` events. Uses idempotency keys to prevent duplicate processing.
+- **Funnel Infrastructure**: Tracks the complete lifecycle of a recovery attempt (Ingested -> Scored -> Policy Executed -> Reconciled) for visibility via the Revenue Leak Graph.
+- **Risk Firewall**: A rule-based + ML classifier that intercepts high-risk or unrecoverable cases (e.g., fraudulent accounts, persistent failures) before any money is spent on recovery.
+- **Decision Engine**: Evaluates candidate actions using the ML models. If the system is unsure, it triggers an LLM fallback to dynamically reason about complex edge cases.
+- **Budget Optimizer**: Formulates recovery as a Knapsack problem, selecting the optimal combination of recovery actions across a batch of cases to maximize Expected Value (EV) under a strict monthly budget cap.
+- **Validation & Reconciliation**: 
   - *Validation*: A pre-execution check to ensure a case hasn't already been recovered externally (stale state) before taking action.
   - *Reconciliation*: A post-execution worker that polls the payment provider to align internal state with ground truth.
-- **Simulation Core (Phase 11 & 11.5)**: A dry-run environment allowing historical replay and counterfactual strategy testing (e.g., "What if we offered a 5% discount instead?") without financial side effects.
+- **Simulation Core**: A dry-run environment allowing historical replay and counterfactual strategy testing (e.g., "What if we offered a 5% discount instead?") without financial side effects.
 
 ## Hardcoded / Simulated Components
 
@@ -37,3 +37,4 @@ For the purposes of this implementation and demo, several external dependencies 
 
 - **Zero-Mutation Execution**: The Simulation Core forces a PostgreSQL nested transaction rollback to guarantee zero side effects when evaluating counterfactuals.
 - **Strict Typing**: All backend models leverage Pydantic/SQLAlchemy 2.0 type hints, and the frontend operates in strict TypeScript mode.
+- **Audit Logging**: Every single decision, fallback, validation failure, and budget exhaustion is recorded into `audit_events` and traceable via `correlation_id` across the distributed system.

@@ -1,156 +1,76 @@
 # RecoverFlow
 
-**AI Revenue Recovery Control Plane** — Razorpay /buildathon · Track 03
+**AI Revenue Recovery Control Plane** 
 
-> RecoverFlow turns payment failure from a reactive operations problem into an intelligent, measurable and governed revenue-optimization loop.
+> RecoverFlow turns payment failure from a reactive operations problem into an intelligent, measurable, and governed revenue-optimization loop.
 
 [![CI](https://github.com/RazzGourav/RecoverFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/RazzGourav/RecoverFlow/actions/workflows/ci.yml)
-![Phase](https://img.shields.io/badge/Phase-0%20Foundation-brightgreen)
 ![Stack](https://img.shields.io/badge/Stack-FastAPI%20%7C%20Next.js%2014%20%7C%20PostgreSQL%20%7C%20Redis-blue)
 
 ---
 
-## What is RecoverFlow?
+## 🛑 Problem Statement
+
+Failed payments and involuntary churn represent a massive, silent leak in recurring revenue for SaaS and subscription businesses. Traditional recovery methods are primitive and reactive:
+- **Blind Retries**: Trying the same card identically every 24 hours until it hard-declines.
+- **Wasted Margins**: Offering discounts to users who would have paid anyway, or spending expensive SMS/Call center budget on unrecoverable accounts.
+- **Operational Silos**: Finance sees a failed payment, engineering sees a webhook error, and marketing sees a lost subscriber, but there is no centralized intelligence connecting the dots.
+
+Businesses need a system that treats revenue recovery as a dynamic optimization problem, intercepting failures and intelligently calculating the best recovery strategy in real-time.
+
+## 🎯 Themes & Goals
+
+1. **Intelligent Capital Efficiency**: Spend recovery budget (discounts, SMS costs) only on users where it maximizes expected value.
+2. **Defensive Safety**: Never execute a stale recovery action, never double-charge a user, and never violate hard compliance policies.
+3. **Full Visibility**: Track the complete lifecycle of a recovery attempt—from webhook ingestion to final financial reconciliation—providing a transparent Revenue Leak Graph.
+
+---
+
+## 💡 Solution & Features
 
 RecoverFlow is an AI-powered decision system that answers five questions for every failed payment:
-
 1. **What revenue is currently at risk?**
 2. **Why is it at risk?**
 3. **Which customers/payments are actually recoverable?**
 4. **What is the safest and most valuable intervention?**
 5. **Did the intervention actually recover money?**
 
-Rather than retrying every failed payment identically, RecoverFlow computes:
+Instead of retrying every failed payment identically, RecoverFlow computes:
+`Recoverability × intervention effectiveness × financial value × customer risk × policy constraints` before taking any action.
 
-```
-Recoverability × intervention effectiveness × financial value × customer risk × policy constraints
-```
-
-…before acting.
-
----
-
-## System Architecture
-
-```
-                         ┌────────────────────────┐
-                         │   Razorpay Test Mode   │
-                         │ APIs + Webhooks        │
-                         └────────────┬───────────┘
-                                      │
-                                      ▼
-                         ┌────────────────────────┐
-                         │ Webhook Gateway        │
-                         │ Signature Validation   │
-                         └────────────┬───────────┘
-                                      │
-                                      ▼
-                         ┌────────────────────────┐
-                         │ Event / Case Manager   │
-                         │ Idempotency + State    │
-                         └────────────┬───────────┘
-                                      │
-             ┌────────────────────────┼─────────────────────────┐
-             │                        │                         │
-             ▼                        ▼                         ▼
-     ┌───────────────┐        ┌──────────────┐         ┌──────────────┐
-     │ Feature Store │        │ Risk Engine  │         │ Audit Log    │
-     └───────┬───────┘        └──────┬───────┘         └──────────────┘
-             │                       │
-             ▼                       │
-     ┌───────────────┐               │
-     │ ML Recovery   │               │
-     │ Predictor     │               │
-     └───────┬───────┘               │
-             │                       │
-             └──────────┬────────────┘
-                        ▼
-              ┌─────────────────────┐
-              │ Decision Orchestrator│
-              └──────────┬──────────┘
-                         │
-                    ┌────┴────┐
-                    ▼         ▼
-             ┌──────────┐ ┌───────────┐
-             │ LLM      │ │ Policy    │
-             │ Reasoner │ │ Engine    │
-             └────┬─────┘ └─────┬─────┘
-                  │             │
-                  └──────┬──────┘
-                         ▼
-                ┌──────────────────┐
-                │ Approval Router  │
-                └────────┬─────────┘
-                         │
-                 ┌───────┴─────────┐
-                 ▼                 ▼
-          Autonomous           Human Review
-                 │                 │
-                 └────────┬────────┘
-                          ▼
-                  ┌───────────────┐
-                  │ Action Layer  │
-                  └──────┬────────┘
-                         │
-                         ▼
-                    Razorpay API
-                         │
-                         ▼
-                ┌─────────────────┐
-                │ Outcome Verifier│
-                └────────┬────────┘
-                         │
-                         ▼
-                ┌──────────────────┐
-                │ Finance Truth    │
-                │ / Reconciliation │
-                └────────┬─────────┘
-                         │
-                         ▼
-                     Evaluation
-                         │
-                         ▼
-                 Dashboard / Reports
-```
+### Key Features
+- **AI Budget Optimizer**: Formulates recovery as a Knapsack problem, selecting the optimal combination of recovery actions to maximize Expected Value (EV) under a strict monthly budget cap.
+- **Risk Firewall**: A rule-based and ML-powered safety layer that intercepts fraudulent or high-risk cases before any money is spent on recovery.
+- **LLM Reasoning Fallback**: Uses Large Language Models to dynamically reason about edge cases and explain complex policy decisions with strict JSON validation.
+- **Validation & Reconciliation Layer**: Pre-execution checks guarantee we never recover a payment that was resolved externally. Post-execution workers poll the payment provider to align internal state with ground truth.
+- **Simulation Lab & Event Replay**: A dry-run environment allowing historical replay and counterfactual strategy testing (e.g., *"What if we offered a 5% discount instead?"*) with zero financial side effects via nested transaction rollbacks.
+- **Revenue Leak Graph**: A visual dashboard providing full funnel visibility from drop-off to successful recovery.
 
 ---
 
-## Repository Structure
+## 🛠️ Working Tech Stack
 
-```
-recoverflow/
-├── apps/
-│   ├── web/              Next.js 14 App Router frontend
-│   └── api/              FastAPI backend
-├── ai/                   ML models and LLM inference (Phase 3–5)
-├── domain/               Business logic domain modules (Phase 4+)
-├── integrations/         Razorpay + Mock provider abstraction (Phase 1)
-├── workers/              Background task workers (Phase 1+)
-├── data/                 Synthetic and raw datasets (Phase 2)
-├── evaluation/           Metrics, baselines, reports (Phase 3+)
-├── tests/                Unit, integration, reliability, security, eval
-├── infra/                Docker configs and CI helpers
-├── docs/                 Architecture, PRD, threat model, backlog
-├── scripts/              Developer scripts (smoke_test.sh)
-├── docker-compose.yml
-├── Dockerfile.api
-├── Dockerfile.web
-├── Dockerfile.worker
-├── .env.example
-├── Makefile
-└── README.md
-```
+| Layer | Technology |
+|---|---|
+| **Frontend** | Next.js 14, TypeScript (strict), Tailwind CSS, Recharts |
+| **Backend API** | FastAPI, Python 3.12, Pydantic v2, structlog |
+| **Database** | PostgreSQL 16, SQLAlchemy 2 (async), Alembic |
+| **Message Queue** | Redis 7, arq (background workers) |
+| **Machine Learning** | XGBoost, scikit-learn (Risk Scoring & Intervention Prediction) |
+| **LLM Reasoning** | OpenAI / Gemini (Fallback explanation engines) |
+| **Infrastructure** | Docker Compose |
+| **CI/CD** | GitHub Actions |
 
 ---
 
-## Local Development
+## 🚀 How to Run Locally
 
 ### Prerequisites
-
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) ≥ 4.x
 - Git
 
-### Run from a clean clone
+### Quickstart
+Run the entire stack from a clean clone using Docker Compose:
 
 ```bash
 git clone https://github.com/RazzGourav/RecoverFlow.git
@@ -158,89 +78,48 @@ cd RecoverFlow
 cp .env.example .env
 docker compose up --build
 ```
+*That's it. No additional steps. Migrations run automatically when the API container starts.*
 
-That's it. No additional steps.
-
-### What you get
-
+### Available Services
 | URL | Service |
 |---|---|
-| `http://localhost:3000` | Next.js frontend (landing page) |
+| `http://localhost:3000` | Next.js frontend (Revenue Control Tower) |
 | `http://localhost:8000/docs` | FastAPI Swagger UI |
 | `http://localhost:8000/health` | Health check (JSON) |
-| `localhost:5432` | PostgreSQL (user: recoverflow, pass: recoverflow) |
+| `localhost:5432` | PostgreSQL (user: `recoverflow`, pass: `recoverflow`) |
 | `localhost:6379` | Redis |
 
-### Alembic migrations
+---
 
-Migrations run **automatically** when the API container starts (`alembic upgrade head`).
+## 🧪 How to Test
 
-To run manually:
+We enforce a strict pre-push sequence to guarantee system integrity. 
 
+### Automated Test Suite
+From the root directory, you can utilize the Makefile commands to run tests across the stack:
 ```bash
-make migrate
-# or
-docker compose exec api alembic upgrade head
+make lint        # Run ruff (Python linter)
+make typecheck   # Run mypy (Python static typing)
+make test        # Run pytest (Unit, Integration, and Simulation tests)
+make smoke       # Run smoke_test.sh to verify API health
 ```
 
-### Developer commands
-
+### Running Simulations & Benchmarks
+The Simulation Lab allows testing of ML models and rule policies. To run a benchmark against the held-out test set:
 ```bash
-make up          # Start all services
-make down        # Stop services
-make test        # Run pytest
-make lint        # Run ruff
-make typecheck   # Run mypy
-make smoke       # Run smoke tests
+# Inside the API container
+python /app/scripts/run_final_benchmark.py
 ```
+This script bypasses database mutations using transaction rollbacks and generates a report comparing AI optimal routing against baseline rule strategies.
+
+### Managing Failures
+All unexpected states (e.g., Duplicate Webhooks, Budget Exhaustion, Stale Validation Blocks) are recorded as `AuditEvent` rows and surfaced in the **Failure Center** dashboard. When debugging, always check the `correlation_id` in structured logs to trace a request from the webhook entrypoint through the ARQ workers.
 
 ---
 
-## Tech Stack
+## 🔒 Safety Principles
 
-| Layer | Technology |
-|---|---|
-| Frontend | Next.js 14, TypeScript (strict), Tailwind CSS |
-| Backend | FastAPI, Python 3.12, Pydantic v2, structlog |
-| Database | PostgreSQL 16, SQLAlchemy 2 (async), Alembic |
-| Queue | Redis 7, arq |
-| ML (Phase 3+) | XGBoost, LightGBM, scikit-learn |
-| LLM (Phase 5+) | OpenAI / Anthropic / Gemini / Mock |
-| Containers | Docker Compose |
-| CI | GitHub Actions |
-
----
-
-## Phase Status
-
-| Phase | Name | Status | Description |
-|---|---|---|---|
-| Phase 0 | Foundation & Structure | ✅ Complete | Repository skeleton, Docker Compose, DB schemas, CI pipeline |
-| Phase 1 | Payment Events | ✅ Complete | Webhook signature validation, idempotency, failure mapping, PaymentProvider abstractions |
-| Phase 2 | Recovery Data Engine | ✅ Complete | Synthetic dataset, dataset card, DB seeding |
-| Phase 3 | ML Engine | ✅ Complete | Recoverability predictor, action effectiveness, risk firewall |
-| 4 | Decision Engine | ✅ Complete | Deterministic policy engine, expected value ranking, audit logger |
-| 5 | LLM Reasoning | ✅ Complete | AI explanation layer with strict schema validation and mutation safety |
-| 6 | Risk Firewall | ✅ Complete | PRD Module D: defense-only safety layer with five risk checks |
-| 7 | Action Layer | ✅ Done | |
-| 7.5 | Validation Layer | ✅ Done | |
-| 8 | Finance Truth Layer | ✅ Done | |
-| 8.5 | Budget Optimizer | ✅ Done | |
-| 9 | Funnel Infrastructure | ✅ Done | |
-| 9.5 | Revenue Leak Graph | ✅ Done | Full funnel visualization with drill-through |
-| 10 | Dashboard | ✅ Done | Control tower, Cases, Intelligence, Policy Studio, Audit |
-| 11 | Simulation Lab | ✅ Done | Batch & Event Replay simulation core |
-| 12 | Failure Center | ✅ Done | Dashboard for blocked, dropped, and failed cases |
-| 13 | Product Polish | ✅ Done | |
-| 14 | Evaluation Freeze | ✅ Complete | Held-out benchmark suite, safety assertions |
-| 15 | Pre-Demo Audit | ✅ Complete | Secrets check, documentation pass, smoke test |
-| 16 | Demo Execution | ✅ Complete | Final submission |
-
----
-
-## Safety Principles
-
-> **The LLM never directly triggers an action.**
+> **The AI/LLM never directly triggers an action.**
 
 Every money-moving action passes through:
 1. ML prediction
@@ -252,37 +131,5 @@ Every money-moving action passes through:
 This means RecoverFlow can always answer:  
 *"Here is what the system predicted, here is what it was allowed to do, here is what it actually did, here is what happened financially, and here is how that compares with a simpler alternative."*
 
----
-
-## Final Evaluation Benchmark
-
-Tested on 100 held-out cases with a budget constraint of ₹250.00.
-
-| Metric | Retry Baseline | Rules Baseline (5% Discount) | RecoverFlow (AI Optimal) |
-|---|---|---|---|
-| **Strategy** | RETRY_PLUS_REMINDER | DISCOUNT_5 | RECOVERFLOW_OPTIMAL |
-| **Cases Actioned** | 100 | 100 | 25 |
-| **Action Cost (₹)** | ₹0.00 | ₹612.21 | ₹250.00 |
-| **Expected Recovery (₹)** | ₹4,285.47 | ₹7,346.52 | ₹8,570.94 |
-| **Net Recovery (₹)** | ₹4,285.47 | ₹6,734.31 | **₹8,320.94** |
-
-- **Budget Optimizer Efficiency**: ~38% higher capital efficiency under tight constraints.
-- **Validation Catch Rate**: 100.00% (All stale actions blocked).
-- **Reconciliation Exception Rate**: 0.00%
-- **Policy Violations / Duplicates**: 0
-
-*(Note: Funnel numbers are descriptive of the drop-off pipeline and based on simulated top-of-funnel events.)*
-
----
-
-## Contributing
-
-See [AGENTS.md](./AGENTS.md) for engineering rules, commit conventions, and pre-push checks. Every agent session and human contributor must follow those rules without exception.
-
----
-
-## Buildathon
-
-- **Event:** Razorpay /buildathon
-- **Track:** 03 — AI Revenue Recovery
-- **Build Window:** 20 August – 5 September 2026
+## 📁 System Architecture Details
+For a deep dive into the architectural sub-systems, decoupled layers, and integrations, see the [System Design Document](./systemdesign.md) in the root directory.
