@@ -12,12 +12,12 @@ Why this file exists:
 import uuid
 
 import structlog
-from integrations.factory import get_provider
+from integrations.integrations.factory import get_provider
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from apps.api.db.models import (
+from db.models import (
     Action,
     ActionType,
     AuditEvent,
@@ -49,11 +49,10 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
     stmt = (
         select(Action)
         .options(
-            joinedload(Action.case).joinedload(RecoveryCase.customer),
-            joinedload(Action.case).joinedload(RecoveryCase.merchant),
+            joinedload(Action.case).joinedload(RecoveryCase.customer)
         )
         .where(Action.id == action_id)
-        .with_for_update()  # Lock row to prevent concurrent execution
+        .with_for_update(of=Action)  # Lock row to prevent concurrent execution
     )
     result = await session.execute(stmt)
     action = result.scalar_one_or_none()
@@ -103,8 +102,8 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
         logger.warning("executor.live_state_fetch_failed", action_id=str(action.id), error=str(e))
         live_state = {}
 
-    from integrations.factory import get_validator
-    from integrations.validation import ValidationStatus
+    from integrations.integrations.factory import get_validator
+    from integrations.integrations.validation import ValidationStatus
     
     validator = get_validator()
     validation_outcome = validator(action.action_type, live_state)
@@ -122,8 +121,7 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
             case_id=case.id,
             event_type=AuditEventType.ACTION_EXECUTED, # Or RISK_FIREWALL_BLOCKED/similar if you add a new event type.
             reason=f"Action blocked by validation layer: {validation_outcome.reason}",
-            actor="SYSTEM",
-            metadata_payload={
+            context={
                 "action_id": str(action.id),
                 "action_type": action.action_type.value,
                 "validation_status": validation_outcome.status.value,
@@ -188,8 +186,7 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
             case_id=case.id,
             event_type=AuditEventType.ACTION_EXECUTED,
             reason=reason_msg,
-            actor="SYSTEM",
-            metadata_payload={
+            context={
                 "action_id": str(action.id),
                 "action_type": action.action_type.value,
                 "provider_reference": action.provider_reference,
@@ -219,8 +216,7 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
             case_id=case.id,
             event_type=AuditEventType.ACTION_EXECUTED,
             reason=f"Execution timed out.",
-            actor="SYSTEM",
-            metadata_payload={
+            context={
                 "action_id": str(action.id),
                 "action_type": action.action_type.value,
                 "error": "TimeoutError",
@@ -250,8 +246,7 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
             case_id=case.id,
             event_type=AuditEventType.ACTION_EXECUTED,  # Or a specific failed event type if defined
             reason=f"Execution failed with exception: {str(e)[:200]}",
-            actor="SYSTEM",
-            metadata_payload={
+            context={
                 "action_id": str(action.id),
                 "action_type": action.action_type.value,
                 "error": str(e),

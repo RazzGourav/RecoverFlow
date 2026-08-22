@@ -9,7 +9,7 @@ Why this file exists:
 
 import uuid
 
-from integrations.base import PaymentProvider
+from integrations.integrations.base import PaymentProvider
 
 
 class MockProvider(PaymentProvider):

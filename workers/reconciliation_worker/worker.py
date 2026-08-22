@@ -18,7 +18,7 @@ from db.models import Action, ExecutionStatus, ActionType, AuditEvent, AuditEven
 from db.session import AsyncSessionLocal
 from sqlalchemy import select
 
-from integrations.factory import get_provider
+from integrations.integrations.factory import get_provider
 
 logger = structlog.get_logger(__name__)
 

@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from apps.api.db.models import (
+from db.models import (
     Action,
     ActionType,
     ExecutionStatus,
@@ -21,7 +21,7 @@ from apps.api.db.models import (
     ReconciliationStatus,
     RecoveryCase,
 )
-from integrations.factory import get_provider
+from integrations.integrations.factory import get_provider
 
 logger = structlog.get_logger(__name__)
 

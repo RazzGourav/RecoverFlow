@@ -12,7 +12,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.api.db.models import AuditEvent, AuditEventType
+from db.models import AuditEvent, AuditEventType
 
 
 async def log_decision(

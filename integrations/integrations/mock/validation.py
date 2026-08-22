@@ -8,7 +8,7 @@ Why this file exists:
 
 from __future__ import annotations
 
-from apps.api.db.models import ActionType
+from db.models import ActionType
 from integrations.integrations.validation import ValidationOutcome, ValidationStatus
 
 
