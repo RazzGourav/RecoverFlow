@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from apps.api.db.database import get_db
+from apps.api.dependencies.db import get_db
 from apps.api.db.models import RecoveryCase, CaseStatus
 from ai.evaluation.simulation_core import simulate_strategy_batch, SimulationResult
 

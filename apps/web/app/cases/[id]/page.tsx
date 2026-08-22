@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import DecisionTrail from "../../components/DecisionTrail";
 
 export const metadata: Metadata = {
   title: "Case Intelligence | RecoverFlow",
@@ -13,7 +14,7 @@ async function getCase(id: string) {
     if (res.status === 404) return null;
     if (!res.ok) throw new Error("Failed to fetch case");
     return res.json();
-  } catch (e) {
+  } catch (error) {
     return null;
   }
 }
@@ -85,11 +86,7 @@ export default async function CaseIntelligencePage({ params }: { params: { id: s
               </div>
             </div>
             
-            {caseData.llm_explanation && (
-              <div className="mt-6 bg-black/20 rounded-lg p-4 text-sm text-white/70 italic border-l-2 border-[#06b6d4]">
-                "{caseData.llm_explanation}"
-              </div>
-            )}
+<DecisionTrail caseData={caseData} />
           </section>
 
           {/* Action Decision */}
