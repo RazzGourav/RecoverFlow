@@ -41,12 +41,14 @@ The underlying domain logic for ML Inference, Risk Firewalls, and Policy executi
 - **Evidence:** The `/funnel/summary` endpoint uses `SyntheticProvider.get_funnel_summary()`, which runs a live `GROUP BY` query on the `funnel_events` table in PostgreSQL to calculate stage counts and drop-off rates.
 
 ### 8. End-to-End Live Webhook Pipeline
-**Verdict:** WORKING (real)
-- **Evidence:** The end-to-end pipeline from webhook ingestion to action execution and reconciliation is fully functional. Firing webhooks via `scripts/simulate_webhook.py` or `scripts/fire_all_actions.py` successfully validates the HMAC, saves the `PaymentEvent`, and enqueues to Redis. The event worker (`workers/event_worker/worker.py`) successfully picks up the job, extracts real synthetic customer data (`customer_id`, `email`, `contact`), creates `Customer` records natively, executes the ML inference and policy pipeline, and queues the resulting Action.
+**Verdict:** FIXES APPLIED, NOT YET RE-VERIFIED
+- **Code review (static):** The webhook ingestion route validates HMAC and persists `PaymentEvent` rows. The event worker (`workers/event_worker/worker.py`) extracts `customer_id`, `email`, `contact` from the Razorpay payload entity, creates or finds a `Customer` record, then runs the decision pipeline. The load-test scripts (`scripts/fire_all_actions.py`, `scripts/simulate_webhook.py`) send payloads whose field names (`customer_id`, `email`, `contact`, `notes.customer_name`) align with the worker's extraction logic.
+- **Not yet verified at runtime:** No real load-test query output has been captured against a running stack to confirm events flow end-to-end through Redis, the event worker, decision pipeline, and action creation. This section will be updated to WORKING only after real `docker compose exec` query output is pasted here unedited.
 
 ### 9. Action Executor Layer
-**Verdict:** WORKING (real)
-- **Evidence:** The recovery worker (`workers/recovery_worker/worker.py`) successfully dispatches actions to `domain/finance/executor.py`. All `ActionType` outputs have real implementations connecting to the `MockProvider` and simulate network timeouts and state transitions accurately. Previously, the executor used fake fallback placeholders for missing customer details; this has been explicitly removed, and the executor now natively blocks actions via a `MISSING_CUSTOMER_DATA` state if real synthetic customer data is unavailable.
+**Verdict:** FIXES APPLIED, NOT YET RE-VERIFIED
+- **Code review (static):** The executor (`domain/finance/executor.py`) correctly gates customer-facing action types (`PAYMENT_LINK`, `INVOICE`, `REMINDER`, `PAYMENT_METHOD_UPDATE`) on the presence of a `Customer` record with a non-null `metadata_` dict. If missing, it sets `VALIDATION_BLOCKED` with reason `MISSING_CUSTOMER_DATA` instead of fabricating placeholder data. For actions that pass validation, it reads `name`, `email`, `contact` from `customer.metadata_` — matching the keys the event worker stores. The fake fallback has been removed.
+- **Not yet verified at runtime:** No real execution output has been captured showing actions reaching `EXECUTED` status with `MATCHED` reconciliation. This section will be updated to WORKING only after real query output is pasted here unedited.
 
 ---
 

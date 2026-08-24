@@ -67,7 +67,6 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase, force
         logger.info(f"TESTING HOOK: amount_paise={amount_int}, modulo={amount_int % 10}")
         if amount_int % 10 != 0:
             index = (amount_int % 10) - 1
-            from db.models import ActionType
             action_list = ["RETRY", "PAYMENT_LINK", "INVOICE", "PAYMENT_METHOD_UPDATE", "REMINDER", "HUMAN_ESCALATION", "NO_ACTION"]
             if 0 <= index < len(action_list):
                 force_action = ActionType(action_list[index])
