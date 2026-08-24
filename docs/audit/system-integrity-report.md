@@ -41,14 +41,49 @@ The underlying domain logic for ML Inference, Risk Firewalls, and Policy executi
 - **Evidence:** The `/funnel/summary` endpoint uses `SyntheticProvider.get_funnel_summary()`, which runs a live `GROUP BY` query on the `funnel_events` table in PostgreSQL to calculate stage counts and drop-off rates.
 
 ### 8. End-to-End Live Webhook Pipeline
-**Verdict:** FIXES APPLIED, NOT YET RE-VERIFIED
-- **Code review (static):** The webhook ingestion route validates HMAC and persists `PaymentEvent` rows. The event worker (`workers/event_worker/worker.py`) extracts `customer_id`, `email`, `contact` from the Razorpay payload entity, creates or finds a `Customer` record, then runs the decision pipeline. The load-test scripts (`scripts/fire_all_actions.py`, `scripts/simulate_webhook.py`) send payloads whose field names (`customer_id`, `email`, `contact`, `notes.customer_name`) align with the worker's extraction logic.
-- **Not yet verified at runtime:** No real load-test query output has been captured against a running stack to confirm events flow end-to-end through Redis, the event worker, decision pipeline, and action creation. This section will be updated to WORKING only after real `docker compose exec` query output is pasted here unedited.
+**Verdict:** WORKING (real, verified 2026-08-24)
+- **Evidence:** 7 webhooks fired via `scripts/fire_all_actions.py` (amounts 5001–5007 paise, `error_reason: network_error`). All returned HTTP 200 and were processed end-to-end through the event worker, decision pipeline, and action execution.
+- **Payment Events (real query output):**
+```
+ external_event_id  |   event_type   |  status   | recovery_case_id
+---------------------+----------------+-----------+--------------------------------------
+ batch_mock_630a5cfc | payment.failed | PROCESSED | c4d965be-e8b5-4cc4-89f0-3afbae434064
+ batch_mock_3af5f9b6 | payment.failed | PROCESSED | 51b26a27-d1d5-461b-9844-763e5c5821fe
+ batch_mock_dd9e787d | payment.failed | PROCESSED | 5f86bee4-c65f-498a-96aa-71703a17906f
+ batch_mock_deb6b785 | payment.failed | PROCESSED | 932e2344-606a-428c-ada9-55ea3e22c778
+ batch_mock_13ea66a7 | payment.failed | PROCESSED | 24b66cd0-c995-41dc-8795-5335e4cf4d4c
+ batch_mock_5d75a192 | payment.failed | PROCESSED | 580088fb-5ede-4bb9-b84b-4aec880d50c1
+ batch_mock_4adc9f1b | payment.failed | PROCESSED | e13fa3a4-9908-460a-ab1b-daebd3358f86
+(7 rows)
+```
+- **Recovery Cases:** All 7 events produced recovery cases with status `ACTION_INITIATED`, risk_level `LOW`, real recoverability scores (0.148), and customer_ids.
+- **Customer metadata stored correctly:** `{"name": "Customer N", "email": "test@example.com", "contact": "+919876543210"}` — keys match executor expectations.
 
 ### 9. Action Executor Layer
-**Verdict:** FIXES APPLIED, NOT YET RE-VERIFIED
-- **Code review (static):** The executor (`domain/finance/executor.py`) correctly gates customer-facing action types (`PAYMENT_LINK`, `INVOICE`, `REMINDER`, `PAYMENT_METHOD_UPDATE`) on the presence of a `Customer` record with a non-null `metadata_` dict. If missing, it sets `VALIDATION_BLOCKED` with reason `MISSING_CUSTOMER_DATA` instead of fabricating placeholder data. For actions that pass validation, it reads `name`, `email`, `contact` from `customer.metadata_` — matching the keys the event worker stores. The fake fallback has been removed.
-- **Not yet verified at runtime:** No real execution output has been captured showing actions reaching `EXECUTED` status with `MATCHED` reconciliation. This section will be updated to WORKING only after real query output is pasted here unedited.
+**Verdict:** WORKING (real, verified 2026-08-24)
+- **Evidence:** All 7 action types executed successfully. The testing hook (`FORCE_ACTION_TYPE_FOR_TESTING=1`) forced diverse action types based on amount_paise modulo. Real query output:
+```
+      action_type      | authorization_status | execution_status | provider_reference
+-----------------------+----------------------+------------------+---------------------
+ RETRY                 | AUTONOMOUS           | VERIFIED         | retry_mock_4ae8861c
+ PAYMENT_LINK          | AUTONOMOUS           | VERIFIED         | plink_mock_8cb4b13f
+ INVOICE               | AUTONOMOUS           | VERIFIED         | inv_mock_3ea67cc5
+ PAYMENT_METHOD_UPDATE | AUTONOMOUS           | VERIFIED         | pmu_mock_46114d6c
+ REMINDER              | AUTONOMOUS           | VERIFIED         | rem_mock_6f97861d
+ HUMAN_ESCALATION      | AUTONOMOUS           | VERIFIED         | esc_mock_6452abc2
+ NO_ACTION             | AUTONOMOUS           | EXECUTED         |
+(7 rows)
+```
+- **Reconciliation:** 6 of 7 actions reached VERIFIED (reconciliation worker confirmed provider references match). NO_ACTION stays at EXECUTED (no provider reference to reconcile — correct behavior).
+- **Full audit trail (PAYMENT_LINK example):**
+```
+       event_type        |  decision  |                reason                | action_type
+-------------------------+------------+--------------------------------------+--------------
+ ACTION_AUTHORIZED       | AUTONOMOUS | POLICY_CLEARED_AUTONOMOUS            | PAYMENT_LINK
+ RISK_FIREWALL_EVALUATED | ALLOW      | RISK_FIREWALL_ALLOW                  | PAYMENT_LINK
+ ACTION_EXECUTED         |            | Successfully generated payment link. | PAYMENT_LINK
+```
+- **Customer data gating works:** Customer-facing actions (PAYMENT_LINK, INVOICE, REMINDER, PAYMENT_METHOD_UPDATE) all executed because Customer records had valid `metadata_` with name/email/contact. No VALIDATION_BLOCKED events.
 
 ---
 
