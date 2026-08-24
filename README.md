@@ -9,7 +9,7 @@
 
 ---
 
-## 🛑 Problem Statement
+## 🛑 Problem Statement/ Theme
 
 Failed payments and involuntary churn represent a massive, silent leak in recurring revenue for SaaS and subscription businesses. Traditional recovery methods are primitive and reactive:
 - **Blind Retries**: Trying the same card identically every 24 hours until it hard-declines.
