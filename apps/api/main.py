@@ -164,6 +164,9 @@ def create_app() -> FastAPI:
     from routes.simulation import router as simulation_router
     app.include_router(simulation_router, tags=["simulation"])
 
+    from routes.admin import router as admin_router
+    app.include_router(admin_router)
+
     return app
 
 

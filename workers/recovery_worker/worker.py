@@ -85,6 +85,7 @@ async def poll_pending_actions(ctx: dict) -> None:
 
 # ARQ worker settings
 class WorkerSettings:
+    queue_name = "arq:recovery_queue"
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     functions = [dispatch_action_job]
     cron_jobs = [

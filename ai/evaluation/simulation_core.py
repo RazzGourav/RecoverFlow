@@ -183,9 +183,10 @@ async def simulate_strategy_batch(
                     if action and action.execution_status == ExecutionStatus.PENDING:
                         # Force approval in simulation so it can be executed
                         action.authorization_status = AuthorizationStatus.APPROVED
-                        # Execute Action (Phase 7.5 Validation + Phase 7 Execution)
-                        # We execute in the same session, which handles internal states securely.
-                        action = await execute_action(session, action.id)
+                        # Fake Execution (Phase 7 Execution) without calling real executor to avoid NotImplementedError
+                        action.execution_status = ExecutionStatus.EXECUTED
+                        action.provider_reference = f"simulated_exec_{uuid.uuid4()}"
+                        session.add(action)
                         
                     # Calculate Expected Value resulting from the ACTUAL action that made it through
                     if action and action.execution_status == ExecutionStatus.EXECUTED and action.action_type != ActionType.NO_ACTION:

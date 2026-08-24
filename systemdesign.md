@@ -1,40 +1,49 @@
-# RecoverFlow — System Architecture & Design
+# RecoverFlow - System Architecture & Design
 
-## Overview
-RecoverFlow is an AI-powered revenue recovery control plane designed to intelligently intercept failed payments and orchestrate recovery strategies using machine learning, mitigating churn while respecting budget constraints. 
+## 1. Overview
+**RecoverFlow** is an AI-powered Revenue Recovery Control Plane built for Razorpay. It replaces static, legacy rule-based retry logic with a dynamic, budget-aware ML policy engine. The system evaluates failed payments in real-time and executes counterfactual simulations to determine the mathematically optimal recovery action (e.g., immediate retry, delayed reminder, dynamic discount, or human intervention) for every drop-off.
 
-## End-to-End Architecture
+## 2. Core Architecture
 
-The system is composed of several decoupled layers:
+The system is composed of several decoupled services, orchestrated via an event-driven architecture.
 
-1. **Frontend (Next.js)**: A standalone React application rendering the Control Tower dashboard, Case Intelligence UI, and Leak Graph.
-2. **Backend API (FastAPI)**: The central orchestration engine handling webhook ingestion, case management, policy execution, and frontend queries.
-3. **Machine Learning Pipeline (XGBoost/scikit-learn)**: Two models - a Risk Scorer for fraud/firewalling, and an Intervention Optimizer to predict the success probability of specific actions (e.g., offering a 10% discount).
-4. **Data Persistence**: PostgreSQL handles core relational models (`cases`, `actions`, `funnel_events`, `audit_events`), while Redis acts as the message broker for ARQ background workers and caching.
-5. **Background Workers (ARQ)**: Asynchronous workers for handling non-blocking tasks like provider reconciliation and bulk payment webhook processing.
+### 2.1 Backend (API & Workers)
+Built with **FastAPI** (Python 3.12) and **ARQ** (Redis-based async task queues).
+- **Web API Layer**: Exposes REST endpoints for webhooks (Razorpay/Mock providers), dashboard data feeds (Audit, Simulation, Analytics), and policy management.
+- **Event Workers**: Processes incoming webhook payloads asynchronously, parses states, and manages idempotency.
+- **Recovery Workers**: Orchestrates the AI Policy Engine evaluation pipeline. Executes the final determined action (or safely blocks it if it fails validation).
+- **Reconciliation Workers**: Periodically matches downstream actions to ultimate success/failure states to close the loop on revenue recovery accounting.
 
-## Sub-Systems & Interactions
+### 2.2 AI & Policy Engine
+- **Predictive ML (XGBoost)**: Evaluates user context, cart value, and session data to predict the probability of recovery for a given candidate action.
+- **Risk Firewall**: Rule-based gatekeeper that enforces hard constraints (e.g., maximum retries exceeded, fraudulent velocity detected).
+- **Budget Optimizer**: Ensures that costly actions (like discounts or SMS blasts) are allocated only to high-yield cases, adhering to a global, replenishing budget.
+- **Deterministic Validation**: The "Safety Net". Before any action actually touches an external API, a strict validation layer ensures the underlying state (e.g., payment status) hasn't mutated since the decision was made.
 
-- **Webhook Ingestion**: Ingests `payment.failed` events. Uses idempotency keys to prevent duplicate processing.
-- **Funnel Infrastructure**: Tracks the complete lifecycle of a recovery attempt (Ingested -> Scored -> Policy Executed -> Reconciled) for visibility via the Revenue Leak Graph.
-- **Risk Firewall**: A rule-based + ML classifier that intercepts high-risk or unrecoverable cases (e.g., fraudulent accounts, persistent failures) before any money is spent on recovery.
-- **Decision Engine**: Evaluates candidate actions using the ML models. If the system is unsure, it triggers an LLM fallback to dynamically reason about complex edge cases.
-- **Budget Optimizer**: Formulates recovery as a Knapsack problem, selecting the optimal combination of recovery actions across a batch of cases to maximize Expected Value (EV) under a strict monthly budget cap.
-- **Validation & Reconciliation**: 
-  - *Validation*: A pre-execution check to ensure a case hasn't already been recovered externally (stale state) before taking action.
-  - *Reconciliation*: A post-execution worker that polls the payment provider to align internal state with ground truth.
-- **Simulation Core**: A dry-run environment allowing historical replay and counterfactual strategy testing (e.g., "What if we offered a 5% discount instead?") without financial side effects.
+### 2.3 Frontend Dashboard
+Built with **Next.js 14**, **React**, **Tailwind CSS**, and **Framer Motion**.
+- **Control Tower**: Global overview of at-risk revenue, recovered revenue, and a live activity feed.
+- **Case Intelligence**: Vertical full-stack drill-down into individual failures, visualizing the AI's step-by-step reasoning (Prediction -> Risk -> Budget -> Validation -> Execution).
+- **Policy Studio**: Interactive interface to tweak budget caps and risk thresholds, immediately simulating the impact on historical cases.
+- **Simulation / Replay Labs**: Counterfactual analysis tools ("Multiverse Simulator") comparing the AI's budget-aware decisions against static legacy rules on live data.
 
-## Hardcoded / Simulated Components
+### 2.4 Data Persistence
+- **PostgreSQL**: The primary relational store. Uses `SQLAlchemy` (async) for ORM and `Alembic` for migrations. Stores normalized domains: `Customers`, `FunnelEvents`, `PaymentEvents`, `RecoveryCases`, `AuditEvents`, `CandidateActions`.
+- **Redis**: Acts as the message broker for ARQ and a high-speed cache for idempotency keys.
 
-For the purposes of this implementation and demo, several external dependencies are simulated:
+## 3. End-to-End Data Flow
 
-1. **Synthetic Data**: The historical data used to train the ML models (`train.csv`, `test.csv`) is synthetically generated to mimic real-world SaaS payment failure patterns. The top-of-funnel volume metrics shown in the Leak Graph are derived from this simulated seed data.
-2. **Payment Providers**: The integration layer (`integrations.mock.provider`) fakes Razorpay API calls. Generating payment links and checking payment status return deterministic mock responses rather than hitting the real live network.
-3. **LLM Fallback**: In the test environments, the LLM reasoning step may be bypassed or simulated to preserve API quotas and ensure deterministic testing.
+1. **Ingestion**: A user drops off at the payment stage. Razorpay fires a `payment.failed` webhook.
+2. **Event Parsing**: The webhook is caught by `/webhooks/razorpay`, checked for idempotency, and placed onto the Redis queue.
+3. **State Hydration**: The `Event Worker` picks up the task, links the payment failure to the preceding `FunnelEvent` (via `session_id`), and instantiates a `RecoveryCase`.
+4. **Policy Evaluation**: The `Recovery Worker` wakes up. It asks the ML model to score all candidate actions (Retry, Discount, Do Nothing).
+5. **Optimization**: The Budget Optimizer runs a knapsack-like evaluation across recent cases to select the action maximizing Expected Value (EV) without blowing the discount budget.
+6. **Validation & Execution**: The chosen action passes through the Validation Layer to prevent "stale state" execution. If clear, the action is executed via the `RazorpayProvider`.
+7. **Audit & Reconciliation**: Every step is heavily logged to `audit_events`. Later, the `Reconciliation Worker` verifies if the user actually paid, marking the case as `RECOVERED` or `FAILED`.
 
-## Security & Reliability
+## 4. Key Design Principles
 
-- **Zero-Mutation Execution**: The Simulation Core forces a PostgreSQL nested transaction rollback to guarantee zero side effects when evaluating counterfactuals.
-- **Strict Typing**: All backend models leverage Pydantic/SQLAlchemy 2.0 type hints, and the frontend operates in strict TypeScript mode.
-- **Audit Logging**: Every single decision, fallback, validation failure, and budget exhaustion is recorded into `audit_events` and traceable via `correlation_id` across the distributed system.
+- **Safety First**: The LLM / ML models *never* execute actions directly. They emit structured recommendations evaluated by deterministic code.
+- **Idempotency**: All mutating webhooks utilize an `idempotency_key` constraint to prevent double-processing in distributed setups.
+- **Reproducibility**: Entire local environments, from databases to worker queues, spin up deterministically via `docker-compose`.
+- **Observability**: The "Explain This" concept is deeply ingrained in the UI; every automated decision leaves a cryptographically traceable audit trail (Risk Score, Budget State, ML Confidence) surfaced in the dashboard.

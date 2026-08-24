@@ -42,6 +42,9 @@ def get_payment_failed_payload(customer_name: str = "Customer") -> dict:
                     "currency": "INR",
                     "status": "failed",
                     "order_id": f"order_mock_{uuid.uuid4().hex[:8]}",
+                    "customer_id": f"cust_mock_{uuid.uuid4().hex[:8]}",
+                    "email": "test@example.com",
+                    "contact": "+919876543210",
                     "notes": {
                         "customer_name": customer_name,
                         "customer_email": "test@example.com"

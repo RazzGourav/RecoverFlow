@@ -20,7 +20,7 @@ from workers.event_worker.worker import normalize_payment_event
 # Setup a dedicated test database engine (assumes postgres is running locally on 5432)
 # We will use the main DB but we can rollback or clean up after.
 # Alternatively, since it's an integration test, we insert data, run worker, verify.
-TEST_DATABASE_URL = "postgresql+asyncpg://recoverflow:recoverflow@postgres:5432/recoverflow"
+TEST_DATABASE_URL = "postgresql+asyncpg://recoverflow:recoverflow@localhost:5432/recoverflow"
 
 @pytest_asyncio.fixture
 async def db_engine_and_session():
@@ -56,11 +56,18 @@ def test_app(db_engine_and_session):
 
 @pytest_asyncio.fixture
 async def integration_client(test_app) -> AsyncClient:
+    from arq import create_pool
+    from arq.connections import RedisSettings
+    from config import settings
+    test_app.state.arq_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+    
     async with AsyncClient(
         transport=ASGITransport(app=test_app),
         base_url="http://testserver",
     ) as ac:
         yield ac
+        
+    await test_app.state.arq_pool.close()
 
 
 @pytest.mark.asyncio
@@ -138,3 +145,60 @@ async def test_full_webhook_flow_creates_recovery_case(integration_client: Async
         
         # So FailureType.UNKNOWN is expected here because it doesn't match the substrings.
         assert case.failure_type == FailureType.UNKNOWN
+
+@pytest.mark.asyncio
+async def test_e2e_queue_worker_picks_up_event(integration_client: AsyncClient, db_engine_and_session) -> None:
+    """
+    Regression test for the ARQ worker queue:
+    Ensures that when the API enqueues a job, the background worker process
+    (which should be running in docker-compose) picks it up and processes it.
+    """
+    import asyncio
+    from db.models import PaymentEventStatus
+    
+    _, TestingSessionLocal = db_engine_and_session
+    settings.razorpay_webhook_secret = "REPLACE_ME"
+    
+    event_id = f"ev_e2e_{uuid.uuid4().hex[:8]}"
+    payment_id = f"pay_e2e_{uuid.uuid4().hex[:8]}"
+    
+    payload = {
+        "event": "payment.failed",
+        "payload": {
+            "payment": {
+                "entity": {
+                    "id": payment_id,
+                    "amount": 42000,
+                    "error_code": "BAD_REQUEST_ERROR",
+                    "error_reason": "payment_failed",
+                }
+            }
+        }
+    }
+    
+    # Hit API. The API will enqueue to Redis because we attached `arq_pool` to `test_app`.
+    response = await integration_client.post(
+        "/webhooks/razorpay",
+        json=payload,
+        headers={"X-Razorpay-Event-Id": event_id},
+    )
+    assert response.status_code == 200
+    
+    # Wait for the background worker to process it. We poll the database for up to 5 seconds.
+    async with TestingSessionLocal() as session:
+        # First verify the event was saved
+        result = await session.execute(select(PaymentEvent).where(PaymentEvent.external_event_id == event_id))
+        event = result.scalar_one_or_none()
+        assert event is not None
+        
+        case = None
+        for _ in range(50):
+            session.expunge_all()
+            result = await session.execute(select(RecoveryCase).where(RecoveryCase.payment_event_id == event.id))
+            case = result.scalar_one_or_none()
+            if case:
+                break
+            await asyncio.sleep(0.1)
+            
+        assert case is not None, "Worker failed to pick up and process the event from the ARQ queue"
+        assert case.amount_paise == 42000

@@ -30,7 +30,8 @@ from apps.api.db.models import (
 )
 from domain.policies.pipeline import run_decision_pipeline
 
-TEST_DATABASE_URL = "postgresql+asyncpg://recoverflow:recoverflow@postgres:5432/recoverflow"
+import os
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "postgresql+asyncpg://recoverflow:recoverflow@localhost:5432/recoverflow")
 
 @pytest_asyncio.fixture
 async def db_engine_and_session():
@@ -156,6 +157,47 @@ async def test_decision_pipeline_blocks_repeated_action(db_engine_and_session):
             if e.event_type == AuditEventType.ACTION_BLOCKED and e.decision == "BLOCKED"
         ]
         assert len(policy_audits) >= 1, "Expected a BLOCKED Policy Engine audit event"
-        audit = policy_audits[0]
         assert audit.decision == "BLOCKED"
         assert audit.reason == "POLICY_COOLDOWN_ACTIVE"
+
+@pytest.mark.asyncio
+async def test_decision_pipeline_real_ranking_when_unset(db_engine_and_session):
+    import os
+    # Ensure env var is unset
+    if "FORCE_ACTION_TYPE_FOR_TESTING" in os.environ:
+        del os.environ["FORCE_ACTION_TYPE_FOR_TESTING"]
+        
+    engine, Session = db_engine_and_session
+    async with Session() as db_session:
+        merchant = Merchant(name="Test Merchant 3")
+        db_session.add(merchant)
+        await db_session.flush()
+        
+        policy = Policy(merchant_id=merchant.id, max_autonomous_amount_paise=500000)
+        db_session.add(policy)
+        
+        case = RecoveryCase(
+            merchant_id=merchant.id,
+            amount_paise=100010, # Modulo 10 is 0, but even if it was not 0, the testing hook should not trigger
+            failure_type=FailureType.TEMPORARY
+        )
+        db_session.add(case)
+        await db_session.commit()
+        
+        await run_decision_pipeline(db_session, case)
+        await db_session.commit()
+        
+        candidates_res = await db_session.execute(
+            select(CandidateAction).where(CandidateAction.case_id == case.id).order_by(CandidateAction.rank)
+        )
+        candidates = candidates_res.scalars().all()
+        
+        actions_res = await db_session.execute(
+            select(Action).where(Action.case_id == case.id)
+        )
+        actions = actions_res.scalars().all()
+        
+        # Real ranking logic means the action taken should match the best candidate
+        assert len(actions) == 1
+        assert actions[0].action_type == candidates[0].action_type
+

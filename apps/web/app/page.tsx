@@ -1,190 +1,254 @@
-import type { Metadata } from "next";
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Suspense } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { LeakGraph } from "./components/LeakGraph";
+import { AlertCircle, ArrowUpRight, CheckCircle2, CircleDollarSign, Loader2, RefreshCcw, ShieldAlert } from "lucide-react";
 
-export const metadata: Metadata = {
-  title: "Revenue Control Tower | RecoverFlow",
-  description: "AI Revenue Recovery Control Plane dashboard.",
-};
-
-async function getMetrics() {
-  try {
-    const res = await fetch("http://api:8000/metrics", { cache: "no-store" });
-    if (!res.ok) return null;
-    return res.json();
-  } catch (e) {
-    return null;
-  }
+function formatCurrency(paise: number) {
+  return `₹${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 }
 
-async function getFeed() {
-  try {
-    const res = await fetch("http://api:8000/dashboard/feed", { cache: "no-store" });
-    if (!res.ok) return null;
-    return res.json();
-  } catch (e) {
-    return null;
-  }
-}
+export default function RevenueControlTower() {
+  const [metrics, setMetrics] = useState<any>(null);
+  const [feed, setFeed] = useState<any>(null);
+  const [leakData, setLeakData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-// Re-use the existing leak graph data fetching logic so we can embed the leak graph directly
-async function getLeakGraphData() {
-  try {
-    const res = await fetch("http://api:8000/leak-graph", { cache: "no-store" });
-    if (!res.ok) return null;
-    return res.json();
-  } catch (e) {
-    return null;
-  }
-}
-
-export default async function RevenueControlTower() {
-  const [metrics, feed, leakData] = await Promise.all([
-    getMetrics(),
-    getFeed(),
-    getLeakGraphData()
-  ]);
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [mRes, fRes, lRes] = await Promise.all([
+          fetch("/api/metrics"),
+          fetch("/api/dashboard/feed"),
+          fetch("/api/leak-graph")
+        ]);
+        
+        if (mRes.ok) setMetrics(await mRes.json());
+        if (fRes.ok) setFeed(await fRes.json());
+        if (lRes.ok) setLeakData(await lRes.json());
+      } catch (e) {
+        console.error("Failed to fetch dashboard data", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+    const interval = setInterval(fetchData, 5000); // Live update every 5s
+    return () => clearInterval(interval);
+  }, []);
 
   const recentCases = feed?.recent_cases || [];
   const highRiskAlerts = feed?.high_risk_alerts || [];
 
-  return (
-    <div className="min-h-screen bg-[#0b1326] text-white p-8 font-sans selection:bg-brand-500/30">
-      {/* Background glow effects for glassmorphism */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-[#581c87]/20 rounded-full blur-[100px]" />
-        <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-[#0f172a]/40 rounded-full blur-[120px]" />
+  if (loading && !metrics) {
+    return (
+      <div className="flex-1 flex items-center justify-center h-full min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
       </div>
+    );
+  }
 
-      <div className="relative z-10 max-w-7xl mx-auto space-y-8">
+  return (
+    <div className="p-8 max-w-[1600px] mx-auto w-full">
+      {/* Header */}
+      <header className="flex items-center justify-between mb-8">
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h1 className="text-3xl font-bold tracking-tight text-white/90">Revenue Control Tower</h1>
+          <p className="text-white/50 text-sm mt-1">Live monitoring and autonomous action command center.</p>
+        </motion.div>
         
-        {/* Header */}
-        <header className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white/90">Revenue Control Tower</h1>
-            <p className="text-white/50 text-sm mt-1">Live monitoring and autonomous action command center.</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link href="/cases" className="text-sm font-medium text-brand-300 hover:text-brand-200 bg-brand-900/30 border border-brand-500/20 px-4 py-2 rounded-lg backdrop-blur-md transition-colors">
-              View All Cases
-            </Link>
-            <Link href="/simulation" className="text-sm font-medium text-[#d946ef] hover:text-[#f0abfc] bg-[#d946ef]/10 border border-[#d946ef]/30 px-4 py-2 rounded-lg backdrop-blur-md transition-colors">
-              Simulation Lab
-            </Link>
-            <Link href="/policies" className="text-sm font-medium text-white hover:text-brand-100 bg-[#06b6d4]/20 border border-[#06b6d4]/40 px-4 py-2 rounded-lg backdrop-blur-md transition-colors">
-              Policy Studio
-            </Link>
-          </div>
-        </header>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex items-center gap-2 bg-[#1e1b4b]/60 backdrop-blur-xl border border-brand-500/30 px-3 py-1.5 rounded-full"
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span className="text-xs font-medium text-emerald-400">System Online</span>
+        </motion.div>
+      </header>
 
-        {/* Top Metrics Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <MetricCard 
-            title="Incremental Recovered"
-            value={metrics ? `₹${(metrics.incremental_recovered_revenue_paise / 100).toLocaleString()}` : "—"}
-            color="text-[#06b6d4]"
-          />
-          <MetricCard 
-            title="Recovery Rate"
-            value={metrics ? `${metrics.recovery_rate_percent}%` : "—"}
-            color="text-[#d946ef]"
-          />
-          <MetricCard 
-            title="Reconciliation Exceptions"
-            value={metrics ? `${metrics.reconciliation_exception_rate_percent}%` : "—"}
-            color="text-white"
-          />
-        </div>
+      {/* Top Metrics Row */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+      >
+        <MetricCard 
+          title="Revenue at Risk"
+          value={metrics ? formatCurrency(metrics.total_revenue_at_risk_paise || 0) : "—"}
+          icon={<AlertCircle className="w-4 h-4 text-rose-400" />}
+          color="text-rose-400"
+          bgGlow="bg-rose-500/10"
+        />
+        <MetricCard 
+          title="Recovered this Period"
+          value={metrics ? formatCurrency(metrics.incremental_recovered_revenue_paise) : "—"}
+          icon={<ArrowUpRight className="w-4 h-4 text-emerald-400" />}
+          color="text-emerald-400"
+          bgGlow="bg-emerald-500/10"
+        />
+        <MetricCard 
+          title="Active Cases"
+          value={metrics ? metrics.active_cases : "—"}
+          icon={<RefreshCcw className="w-4 h-4 text-brand-400" />}
+          color="text-brand-400"
+          bgGlow="bg-brand-500/10"
+        />
+        <MetricCard 
+          title="Budget Remaining"
+          value={metrics ? formatCurrency(metrics.budget_remaining_paise || 0) : "—"}
+          icon={<CircleDollarSign className="w-4 h-4 text-[#d946ef]" />}
+          color="text-[#d946ef]"
+          bgGlow="bg-[#d946ef]/10"
+        />
+      </motion.div>
 
-        {/* Funnel Graph Section */}
-        <section className="bg-[#1e1b4b]/40 backdrop-blur-2xl rounded-2xl border border-white/10 p-6 shadow-2xl">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-white/80">Revenue Leak Funnel</h2>
-            <Link href="/leak-graph" className="text-xs text-[#06b6d4] hover:underline">Expand View</Link>
+      {/* Risk Alert Banner */}
+      <AnimatePresence>
+        {highRiskAlerts.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginBottom: 32 }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 flex items-center justify-between backdrop-blur-md">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center">
+                  <ShieldAlert className="w-4 h-4 text-rose-400" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-rose-400">Risk Firewall Engaged</h4>
+                  <p className="text-xs text-rose-300/70">{highRiskAlerts.length} cases actively blocked and requiring human review.</p>
+                </div>
+              </div>
+              <Link href="/cases?filter=blocked" className="text-xs font-medium bg-rose-500/20 text-rose-300 px-3 py-1.5 rounded-lg hover:bg-rose-500/30 transition-colors">
+                Review Cases
+              </Link>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Left Column: Funnel Graph */}
+        <motion.section 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2 }}
+          className="lg:col-span-2 bg-[#1e1b4b]/40 backdrop-blur-2xl rounded-2xl border border-white/5 p-6 shadow-2xl relative overflow-hidden group"
+        >
+          <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-brand-500/5 rounded-full blur-[100px] pointer-events-none group-hover:bg-brand-500/10 transition-colors duration-700" />
+          
+          <div className="flex items-center justify-between mb-6 relative z-10">
+            <div>
+              <h2 className="text-lg font-semibold text-white/90">Revenue Leak Funnel</h2>
+              <p className="text-xs text-white/40">End-to-end recovery conversion visibility</p>
+            </div>
+            <Link href="/leak-graph" className="text-xs font-medium text-brand-400 hover:text-brand-300 flex items-center gap-1 bg-brand-500/10 px-3 py-1.5 rounded-lg transition-colors">
+              Deep Dive <ArrowUpRight className="w-3 h-3" />
+            </Link>
           </div>
           {leakData ? (
              <LeakGraph initialData={leakData} />
           ) : (
             <div className="h-64 flex items-center justify-center text-white/40">No funnel data available</div>
           )}
-        </section>
+        </motion.section>
 
-        {/* Two-column Bottom Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Right Column: Live Feed */}
+        <motion.section 
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-[#1e1b4b]/40 backdrop-blur-2xl rounded-2xl border border-white/5 p-6 shadow-2xl flex flex-col h-[600px] relative"
+        >
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-lg font-semibold text-white/90 flex items-center gap-2">
+                Live Case Feed
+              </h2>
+              <p className="text-xs text-white/40">Real-time intervention tracker</p>
+            </div>
+            <div className="flex gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
           
-          {/* Recent Cases */}
-          <section className="bg-[#1e1b4b]/40 backdrop-blur-2xl rounded-2xl border border-white/10 p-6 shadow-2xl flex flex-col h-[400px]">
-            <h2 className="text-lg font-semibold text-white/80 mb-4 flex items-center justify-between">
-              Recent Cases
-              <span className="text-xs font-normal text-white/40 px-2 py-1 rounded bg-white/5">{recentCases.length} records</span>
-            </h2>
-            <div className="overflow-y-auto flex-1 pr-2 space-y-3 custom-scrollbar">
+          <div className="overflow-y-auto flex-1 pr-2 space-y-3 custom-scrollbar">
+            <AnimatePresence initial={false}>
               {recentCases.map((c: any) => (
-                <Link href={`/cases/${c.id}`} key={c.id} className="block bg-black/20 hover:bg-black/40 border border-white/5 rounded-xl p-4 transition-colors">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-sm font-medium text-white/70 truncate mr-4">{c.id.split("-")[0]}...</span>
-                    <span className="text-sm font-semibold text-white">₹{(c.amount_paise / 100).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className={`px-2 py-0.5 rounded-full ${getStatusColor(c.status)}`}>
-                      {c.status}
-                    </span>
-                    <span className="text-white/40">{new Date(c.created_at).toLocaleTimeString()}</span>
-                  </div>
-                </Link>
+                <motion.div
+                  key={c.id}
+                  initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  layout
+                  className="block group"
+                >
+                  <Link href={`/cases/${c.id}`} className="block bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 rounded-xl p-4 transition-all hover:border-brand-500/30">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center gap-2">
+                        {c.status === 'RECOVERED' ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        ) : c.status === 'FAILED' || c.status === 'UNRECOVERABLE' ? (
+                          <AlertCircle className="w-4 h-4 text-rose-400" />
+                        ) : (
+                          <RefreshCcw className="w-4 h-4 text-brand-400" />
+                        )}
+                        <span className="text-sm font-medium text-white/80 group-hover:text-white transition-colors">
+                          {c.id.split("-")[0]}
+                        </span>
+                      </div>
+                      <span className="text-sm font-bold text-white tracking-tight">{formatCurrency(c.amount_paise)}</span>
+                    </div>
+                    <div className="flex justify-between items-center mt-3">
+                      <span className={cn("px-2 py-0.5 rounded-md text-[10px] font-medium border", getStatusColor(c.status))}>
+                        {c.status}
+                      </span>
+                      <span className="text-[11px] text-white/40 font-medium">
+                        {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </span>
+                    </div>
+                  </Link>
+                </motion.div>
               ))}
-              {recentCases.length === 0 && (
-                <div className="text-center text-white/40 py-8 text-sm">No recent cases found.</div>
-              )}
-            </div>
-          </section>
+            </AnimatePresence>
+            {recentCases.length === 0 && (
+              <div className="h-full flex items-center justify-center text-sm text-white/30">
+                Awaiting events...
+              </div>
+            )}
+          </div>
+        </motion.section>
 
-          {/* High-Risk Alerts */}
-          <section className="bg-[#1e1b4b]/40 backdrop-blur-2xl rounded-2xl border border-[#d946ef]/20 p-6 shadow-2xl flex flex-col h-[400px] relative overflow-hidden">
-            {/* Subtle alert pulsing background */}
-            <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-[#d946ef]/5 rounded-full blur-[80px] animate-pulse pointer-events-none" />
-            
-            <h2 className="text-lg font-semibold text-[#d946ef] mb-4 flex items-center justify-between relative z-10">
-              <span className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#d946ef] opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#d946ef]"></span>
-                </span>
-                High-Risk Alerts
-              </span>
-              <span className="text-xs font-normal text-white/40 px-2 py-1 rounded bg-white/5">{highRiskAlerts.length} active</span>
-            </h2>
-            <div className="overflow-y-auto flex-1 pr-2 space-y-3 custom-scrollbar relative z-10">
-              {highRiskAlerts.map((c: any) => (
-                <Link href={`/cases/${c.id}`} key={c.id} className="block bg-black/20 hover:bg-[#d946ef]/10 border border-[#d946ef]/20 rounded-xl p-4 transition-colors">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-sm font-medium text-white/90 truncate mr-4">Action Required</span>
-                    <span className="text-sm font-semibold text-[#d946ef]">₹{(c.amount_paise / 100).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-white/60">Risk Level: HIGH</span>
-                    <span className="text-white/40">{new Date(c.created_at).toLocaleTimeString()}</span>
-                  </div>
-                </Link>
-              ))}
-              {highRiskAlerts.length === 0 && (
-                <div className="text-center text-white/40 py-8 text-sm">No high-risk alerts currently active.</div>
-              )}
-            </div>
-          </section>
-
-        </div>
       </div>
     </div>
   );
 }
 
-function MetricCard({ title, value, color }: { title: string; value: string; color: string }) {
+function MetricCard({ title, value, icon, color, bgGlow }: { title: string; value: string | number; icon: React.ReactNode; color: string; bgGlow: string }) {
   return (
-    <div className="bg-[#1e1b4b]/40 backdrop-blur-2xl rounded-2xl border border-white/10 p-6 shadow-2xl flex flex-col justify-center min-h-[140px] hover:border-white/20 transition-all">
-      <h3 className="text-sm font-medium text-white/50 mb-2">{title}</h3>
-      <div className={`text-4xl font-bold tracking-tight ${color} filter drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]`}>
+    <div className="bg-[#1e1b4b]/40 backdrop-blur-2xl rounded-2xl border border-white/5 p-5 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-colors">
+      <div className={cn("absolute -right-4 -top-4 w-24 h-24 rounded-full blur-[40px] pointer-events-none opacity-50 transition-opacity group-hover:opacity-100", bgGlow)} />
+      <div className="flex items-center justify-between mb-3 relative z-10">
+        <h3 className="text-xs font-medium text-white/50 uppercase tracking-wider">{title}</h3>
+        <div className={cn("p-1.5 rounded-lg bg-white/5", color)}>
+          {icon}
+        </div>
+      </div>
+      <div className={cn("text-3xl font-bold tracking-tight relative z-10", color)}>
         {value}
       </div>
     </div>
@@ -193,9 +257,18 @@ function MetricCard({ title, value, color }: { title: string; value: string; col
 
 function getStatusColor(status: string) {
   switch (status) {
-    case 'RECOVERED': return 'bg-[#06b6d4]/20 text-[#06b6d4] border border-[#06b6d4]/30';
-    case 'PENDING': return 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30';
-    case 'FAILED': return 'bg-red-500/20 text-red-300 border border-red-500/30';
-    default: return 'bg-white/10 text-white/60 border border-white/20';
+    case 'RECOVERED': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+    case 'PENDING': 
+    case 'EXECUTING': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+    case 'HUMAN_REVIEW': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+    case 'FAILED': 
+    case 'UNRECOVERABLE': return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+    default: return 'bg-white/5 text-white/60 border-white/10';
   }
+}
+
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
 }

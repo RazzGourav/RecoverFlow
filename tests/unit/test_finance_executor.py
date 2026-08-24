@@ -195,3 +195,35 @@ async def test_validation_layer_unsupported(db_session, setup_test_case, monkeyp
     updated_action = await execute_action(db_session, action.id)
     
     assert updated_action.execution_status == ExecutionStatus.VALIDATION_BLOCKED
+
+
+@pytest.mark.asyncio
+async def test_validation_layer_valid_state(db_session, setup_test_case, monkeypatch):
+    """
+    Regression test: Simulates a normal, unretried failed payment state.
+    Asserts that the validation layer returns VALID and execution proceeds.
+    """
+    case, _, _ = setup_test_case
+    
+    mock_provider = MockProvider()
+    # Mock live state saying it's genuinely failed
+    mock_provider.fetch_payment = AsyncMock(return_value={"status": "failed"})
+    mock_provider.create_payment_link = AsyncMock(return_value="plink_mock_valid")
+    
+    monkeypatch.setattr("domain.finance.executor.get_provider", lambda: mock_provider)
+    
+    action = Action(
+        case_id=case.id,
+        action_type=ActionType.PAYMENT_LINK,
+        authorization_status=AuthorizationStatus.AUTONOMOUS,
+        execution_status=ExecutionStatus.PENDING,
+        idempotency_key=f"idem_{uuid.uuid4()}"
+    )
+    db_session.add(action)
+    await db_session.commit()
+    
+    updated_action = await execute_action(db_session, action.id)
+    
+    # Validation should allow execution, reaching EXECUTED
+    assert updated_action.execution_status == ExecutionStatus.EXECUTED
+    assert mock_provider.create_payment_link.call_count == 1

@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Sidebar } from "./components/Sidebar";
 
 /**
  * RecoverFlow root layout.
- *
- * Why: Next.js App Router requires a root layout that wraps all pages.
- * This is where global metadata, fonts (via Google Fonts CSS import in
- * globals.css), and any providers are mounted exactly once.
  */
 
 export const metadata: Metadata = {
@@ -15,24 +12,7 @@ export const metadata: Metadata = {
     default: "RecoverFlow — AI Revenue Recovery Control Plane",
   },
   description:
-    "RecoverFlow turns payment failure from a reactive operations problem into an " +
-    "intelligent, measurable and governed revenue-optimization loop.",
-  keywords: [
-    "revenue recovery",
-    "payment failure",
-    "AI",
-    "Razorpay",
-    "subscription",
-    "fintech",
-  ],
-  authors: [{ name: "RecoverFlow Team" }],
-  openGraph: {
-    type: "website",
-    title: "RecoverFlow — AI Revenue Recovery Control Plane",
-    description:
-      "Predicts which failures can be recovered and chooses the best next action.",
-    siteName: "RecoverFlow",
-  },
+    "RecoverFlow turns payment failure from a reactive operations problem into an intelligent, measurable and governed revenue-optimization loop.",
 };
 
 export default function RootLayout({
@@ -42,8 +22,17 @@ export default function RootLayout({
 }>): React.JSX.Element {
   return (
     <html lang="en" className="dark">
-      <body className="bg-surface-900 text-text-primary antialiased">
-        {children}
+      <body className="bg-[#0b1326] text-white antialiased flex min-h-screen selection:bg-brand-500/30">
+        <Sidebar />
+        <main className="flex-1 min-w-0 relative">
+          <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+            <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-[#581c87]/10 rounded-full blur-[100px]" />
+            <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-[#0f172a]/40 rounded-full blur-[120px]" />
+          </div>
+          <div className="relative z-10 w-full">
+            {children}
+          </div>
+        </main>
       </body>
     </html>
   );

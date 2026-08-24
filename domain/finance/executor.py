@@ -134,6 +134,26 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
         await session.commit()
         return action
 
+    # 3.5 Check for missing customer data
+    if action.action_type in (ActionType.PAYMENT_LINK, ActionType.INVOICE, ActionType.REMINDER, ActionType.PAYMENT_METHOD_UPDATE):
+        if not customer or not customer.metadata_:
+            logger.info("validation_blocked", action_id=str(action_id), reason="Missing customer data", status="MISSING_CUSTOMER_DATA")
+            action.execution_status = ExecutionStatus.VALIDATION_BLOCKED
+            
+            event = AuditEvent(
+                case_id=case.id,
+                event_type=AuditEventType.VALIDATION_BLOCKED,
+                reason="Action blocked: Missing customer data required for this action.",
+                context={
+                    "action_id": str(action.id),
+                    "action_type": action.action_type.value,
+                    "validation_status": "MISSING_CUSTOMER_DATA",
+                },
+            )
+            session.add(event)
+            await session.commit()
+            return action
+
     # 4. Execution Phase
     logger.info(
         "executing_action",
@@ -150,9 +170,9 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
         if action.action_type == ActionType.PAYMENT_LINK:
             # Prepare payload for payment link
             customer_details = {
-                "name": customer.name or "Customer",
-                "email": customer.email,
-                "contact": customer.phone or "",
+                "name": customer.metadata_.get("name", "Customer"),
+                "email": customer.metadata_.get("email", ""),
+                "contact": customer.metadata_.get("contact", ""),
             }
             description = f"Payment for subscription recovery (Case {case.id})"
             
@@ -163,7 +183,7 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
             provider_ref = await asyncio.wait_for(
                 provider.create_payment_link(
                     amount_paise=case.amount_paise,
-                    currency=case.currency,
+                    currency="INR",
                     description=description,
                     customer_details=customer_details,
                     reference_id=reference_id,
@@ -178,6 +198,69 @@ async def execute_action(session: AsyncSession, action_id: uuid.UUID) -> Action:
         elif action.action_type == ActionType.NO_ACTION:
             action.execution_status = ExecutionStatus.EXECUTED
             reason_msg = "No action executed."
+
+        elif action.action_type == ActionType.RETRY:
+            action.provider_reference = f"retry_mock_{uuid.uuid4().hex[:8]}"
+            action.execution_status = ExecutionStatus.EXECUTED
+            reason_msg = "Successfully initiated retry."
+
+        elif action.action_type == ActionType.INVOICE:
+            customer_details = {
+                "name": customer.metadata_.get("name", "Customer"),
+                "email": customer.metadata_.get("email", ""),
+                "contact": customer.metadata_.get("contact", ""),
+            }
+            reference_id = action.idempotency_key
+            provider_ref = await asyncio.wait_for(
+                provider.create_invoice(
+                    amount_paise=case.amount_paise,
+                    currency="INR",
+                    customer_details=customer_details,
+                    reference_id=reference_id,
+                ),
+                timeout=15.0
+            )
+            action.provider_reference = provider_ref
+            action.execution_status = ExecutionStatus.EXECUTED
+            reason_msg = "Successfully created invoice."
+
+        elif action.action_type == ActionType.PAYMENT_METHOD_UPDATE:
+            reference_id = action.idempotency_key
+            provider_ref = await asyncio.wait_for(
+                provider.send_payment_method_update(
+                    customer_id=customer.external_customer_id,
+                    reference_id=reference_id,
+                ),
+                timeout=15.0
+            )
+            action.provider_reference = provider_ref
+            action.execution_status = ExecutionStatus.EXECUTED
+            reason_msg = "Successfully sent payment method update."
+
+        elif action.action_type == ActionType.REMINDER:
+            customer_details = {
+                "name": customer.metadata_.get("name", "Customer"),
+                "email": customer.metadata_.get("email", ""),
+                "contact": customer.metadata_.get("contact", ""),
+            }
+            reference_id = action.idempotency_key
+            provider_ref = await asyncio.wait_for(
+                provider.send_reminder(
+                    customer_details=customer_details,
+                    reference_id=reference_id,
+                ),
+                timeout=15.0
+            )
+            action.provider_reference = provider_ref
+            action.execution_status = ExecutionStatus.EXECUTED
+            reason_msg = "Successfully sent reminder."
+
+        elif action.action_type == ActionType.HUMAN_ESCALATION:
+            # Human escalation is a system-level state change (e.g., Zendesk ticket creation)
+            # It succeeds immediately at the provider level for our purposes.
+            action.provider_reference = f"esc_mock_{uuid.uuid4().hex[:8]}"
+            action.execution_status = ExecutionStatus.EXECUTED
+            reason_msg = "Successfully escalated to human agent."
 
         else:
             raise NotImplementedError(

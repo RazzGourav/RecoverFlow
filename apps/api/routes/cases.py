@@ -37,7 +37,7 @@ async def approve_action(action_id: uuid.UUID, request: Request, db: AsyncSessio
     # Enqueue execution
     pool = getattr(request.app.state, "arq_pool", None)
     if pool:
-        await pool.enqueue_job("dispatch_action_job", action_id=str(action.id))
+        await pool.enqueue_job("dispatch_action_job", action_id=str(action.id), _queue_name="arq:recovery_queue")
     else:
         # Fallback to creating a one-off connection
         from arq import create_pool
@@ -46,7 +46,7 @@ async def approve_action(action_id: uuid.UUID, request: Request, db: AsyncSessio
         from config import settings
         try:
             pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
-            await pool.enqueue_job("dispatch_action_job", action_id=str(action.id))
+            await pool.enqueue_job("dispatch_action_job", action_id=str(action.id), _queue_name="arq:recovery_queue")
             await pool.close()
         except Exception:
             pass # The cron fallback will pick it up
@@ -106,6 +106,7 @@ async def list_cases(
             "id": str(c.id),
             "status": c.status.value if hasattr(c.status, 'value') else c.status,
             "amount_paise": c.amount_paise,
+            "expected_recovery_paise": int(c.recoverability_score * c.amount_paise) if c.recoverability_score is not None else 0,
             "failure_type": c.failure_type.value if hasattr(c.failure_type, 'value') else c.failure_type,
             "risk_level": (c.risk_level.value if hasattr(c.risk_level, 'value') else c.risk_level) if c.risk_level else None,
             "customer_segment": (c.customer.segment.value if hasattr(c.customer.segment, 'value') else c.customer.segment) if c.customer else None,

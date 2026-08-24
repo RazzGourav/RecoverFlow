@@ -97,12 +97,46 @@ async def normalize_payment_event(ctx: dict, payment_event_id: str) -> None:
             # Map failure type
             failure_type = map_razorpay_failure(payload)
 
+            # Extract or Create Customer
+            customer_id_ext = payment_entity.get("customer_id")
+            email_ext = payment_entity.get("email") or payment_entity.get("notes", {}).get("customer_email")
+            contact_ext = payment_entity.get("contact")
+            name_ext = payment_entity.get("notes", {}).get("customer_name") or "Unknown"
+
+            customer_record = None
+            if customer_id_ext:
+                from db.models import Customer
+                # Get the first merchant to attach the customer to (assuming single tenant for now)
+                from db.models import Merchant
+                merchant = (await session.execute(select(Merchant))).scalars().first()
+                
+                customer_result = await session.execute(
+                    select(Customer).where(Customer.external_customer_id == customer_id_ext)
+                )
+                customer_record = customer_result.scalar_one_or_none()
+                
+                if not customer_record and merchant:
+                    # Create customer
+                    customer_record = Customer(
+                        merchant_id=merchant.id,
+                        external_customer_id=customer_id_ext,
+                        metadata_={
+                            "email": email_ext,
+                            "contact": contact_ext,
+                            "name": name_ext,
+                        }
+                    )
+                    session.add(customer_record)
+                    await session.flush()
+
             # Create recovery case
             case = RecoveryCase(
                 payment_event_id=event.id,
                 external_payment_id=external_payment_id,
                 amount_paise=amount_paise,
                 failure_type=failure_type,
+                customer_id=customer_record.id if customer_record else None,
+                merchant_id=merchant.id if merchant else None,
             )
             session.add(case)
             
@@ -127,8 +161,17 @@ async def normalize_payment_event(ctx: dict, payment_event_id: str) -> None:
             raise
 
 
+async def startup(ctx: dict) -> None:
+    logger.info("worker.started", queue_name="arq:event_queue", functions="normalize_payment_event")
+
+async def shutdown(ctx: dict) -> None:
+    logger.info("worker.shutdown", queue_name="arq:event_queue")
+
 # ARQ worker settings
 class WorkerSettings:
+    queue_name = "arq:event_queue"
+    on_startup = startup
+    on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     functions = [normalize_payment_event]
     max_jobs = settings.worker_concurrency

@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import ReconciliationRecord, ReconciliationStatus
+from db.models import Action, CandidateAction, CaseStatus, ReconciliationRecord, ReconciliationStatus, RecoveryCase
 from dependencies.db import get_db
 
 router = APIRouter()
@@ -20,9 +20,11 @@ class MetricsResponse(BaseModel):
     incremental_recovered_revenue_paise: int
     recovery_rate_percent: float
     reconciliation_exception_rate_percent: float
+    total_revenue_at_risk_paise: int
+    active_cases: int
+    budget_remaining_paise: int
 
-
-@router.get("/", response_model=MetricsResponse)
+@router.get("", response_model=MetricsResponse)
 async def get_metrics(db: AsyncSession = Depends(get_db)):
     """
     Computes system-level recovery metrics.
@@ -57,9 +59,37 @@ async def get_metrics(db: AsyncSession = Depends(get_db)):
     exception_rate = 0.0
     if total_records > 0:
         exception_rate = (exceptions / total_records) * 100.0
+        
+    # 4. Total Revenue at Risk
+    risk_stmt = select(func.sum(RecoveryCase.amount_paise)).where(
+        RecoveryCase.status != CaseStatus.RECOVERED
+    )
+    risk_result = await db.execute(risk_stmt)
+    total_risk = risk_result.scalar() or 0
+    
+    # 5. Active Cases
+    active_stmt = select(func.count(RecoveryCase.id)).where(
+        RecoveryCase.status.in_([CaseStatus.OPEN, CaseStatus.ANALYZING, CaseStatus.AWAITING_APPROVAL, CaseStatus.ACTION_INITIATED, CaseStatus.VERIFYING])
+    )
+    active_result = await db.execute(active_stmt)
+    active_cases = active_result.scalar() or 0
+
+    # 6. Budget Remaining (Fixed budget of 50000 paise for demo purposes minus spent)
+    budget_cap = 50000 
+    spent_stmt = (
+        select(func.sum(CandidateAction.action_cost_paise))
+        .select_from(Action)
+        .join(CandidateAction, (Action.case_id == CandidateAction.case_id) & (Action.action_type == CandidateAction.action_type))
+    )
+    spent_result = await db.execute(spent_stmt)
+    spent = spent_result.scalar() or 0
+    budget_remaining = max(0, budget_cap - spent)
 
     return MetricsResponse(
         incremental_recovered_revenue_paise=int(recovered_revenue),
         recovery_rate_percent=round(recovery_rate, 2),
-        reconciliation_exception_rate_percent=round(exception_rate, 2)
+        reconciliation_exception_rate_percent=round(exception_rate, 2),
+        total_revenue_at_risk_paise=int(total_risk),
+        active_cases=int(active_cases),
+        budget_remaining_paise=int(budget_remaining)
     )

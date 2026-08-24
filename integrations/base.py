@@ -56,3 +56,39 @@ class PaymentProvider(Protocol):
         Fetch details of a specific payment.
         """
         ...
+
+    async def create_invoice(self, amount_paise: int, currency: str, customer_details: dict, reference_id: str) -> str:
+        """
+        Create and send an invoice. Returns external provider's unique ID for the invoice.
+        """
+        ...
+
+    async def fetch_invoice(self, invoice_id: str) -> dict:
+        """
+        Fetch details of an existing invoice.
+        """
+        ...
+
+    async def send_payment_method_update(self, customer_id: str, reference_id: str) -> str:
+        """
+        Send a payment method update request. Returns reference ID.
+        """
+        ...
+
+    async def fetch_payment_method_update(self, update_id: str) -> dict:
+        """
+        Fetch status of a payment method update request.
+        """
+        ...
+
+    async def send_reminder(self, customer_details: dict, reference_id: str) -> str:
+        """
+        Send a payment reminder. Returns reference ID.
+        """
+        ...
+
+    async def fetch_reminder(self, reminder_id: str) -> dict:
+        """
+        Fetch status of a sent reminder.
+        """
+        ...

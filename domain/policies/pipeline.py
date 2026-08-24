@@ -59,6 +59,20 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase, force
     import structlog
     structlog.contextvars.bind_contextvars(case_id=str(case.id), model_version="v0.1.0-alpha")
     
+    # TESTING HOOK: Force ActionType based on amount_paise ones digit
+    import os
+    if os.environ.get("FORCE_ACTION_TYPE_FOR_TESTING") == "1":
+        amount_int = int(case.amount_paise)
+        logger = structlog.get_logger(__name__)
+        logger.info(f"TESTING HOOK: amount_paise={amount_int}, modulo={amount_int % 10}")
+        if amount_int % 10 != 0:
+            index = (amount_int % 10) - 1
+            from db.models import ActionType
+            action_list = ["RETRY", "PAYMENT_LINK", "INVOICE", "PAYMENT_METHOD_UPDATE", "REMINDER", "HUMAN_ESCALATION", "NO_ACTION"]
+            if 0 <= index < len(action_list):
+                force_action = ActionType(action_list[index])
+                logger.info(f"TESTING HOOK: Forcing action to {force_action.value}")
+    
     case.status = CaseStatus.ANALYZING
     await session.flush()
     
@@ -71,17 +85,27 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase, force
     policy = result.scalars().first()
     
     if not policy:
-        # Failsafe if DB has no policies at all
-        raise RuntimeError("No active policy found in database to evaluate case.")
-        
-    policy_config = {
-        "max_autonomous_amount_paise": policy.max_autonomous_amount_paise,
-        "human_review_threshold_paise": policy.human_review_threshold_paise,
-        "confidence_threshold": policy.confidence_threshold,
-        "retry_limit": policy.retry_limit,
-        "cooldown_hours": policy.cooldown_hours,
-        "max_contacts_per_72h": policy.max_contacts_per_72h
-    }
+        import structlog
+        structlog.get_logger(__name__).warning("No active policy found. Using default system policy.")
+        policy_config = {
+            "max_autonomous_amount_paise": 500_000,
+            "human_review_threshold_paise": 2_500_000,
+            "confidence_threshold": 0.80,
+            "retry_limit": 2,
+            "cooldown_hours": 12,
+            "max_contacts_per_72h": 2
+        }
+        policy_version = "default_1.0"
+    else:
+        policy_config = {
+            "max_autonomous_amount_paise": policy.max_autonomous_amount_paise,
+            "human_review_threshold_paise": policy.human_review_threshold_paise,
+            "confidence_threshold": policy.confidence_threshold,
+            "retry_limit": policy.retry_limit,
+            "cooldown_hours": policy.cooldown_hours,
+            "max_contacts_per_72h": policy.max_contacts_per_72h
+        }
+        policy_version = policy.version
     
     # 2. Extract context & run AI (Phase 3)
     case_context = build_case_context(case)
@@ -213,7 +237,7 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase, force
         decision=firewall_result.outcome.value,
         reason=firewall_result.primary_reason,
         model_version=decision_contract.model_version,
-        policy_version=policy.version,
+        policy_version=policy_version,
         event_type=rf_event_type,
         context={
             "firewall_score": firewall_result.overall_score,
@@ -287,7 +311,7 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase, force
             decision=status,
             reason=f"LLM_TIMEOUT_OR_FAILURE: {e!s}",
             model_version=decision_contract.model_version,
-            policy_version=policy.version,
+            policy_version=policy_version,
             event_type=AuditEventType.LLM_EXPLANATION_FAILED,
             context={"error": str(e)}
         )
@@ -307,7 +331,7 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase, force
         decision=status,
         reason=reason,
         model_version=decision_contract.model_version,
-        policy_version=policy.version,
+        policy_version=policy_version,
         context=context_data
     )
 
@@ -319,7 +343,7 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase, force
         
         try:
             pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
-            await pool.enqueue_job("dispatch_action_job", action_id=str(action.id))
+            await pool.enqueue_job("dispatch_action_job", action_id=str(action.id), _queue_name="arq:recovery_queue")
             await pool.close()
         except Exception as e:
             import structlog

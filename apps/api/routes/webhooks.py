@@ -139,6 +139,7 @@ async def razorpay_webhook(
         await pool.enqueue_job(
             "normalize_payment_event",
             payment_event_id=str(event_record.id),
+            _queue_name="arq:event_queue",
         )
         logger.info("webhook.enqueued", external_event_id=event_id, internal_id=str(event_record.id))
     else:
