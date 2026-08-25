@@ -157,6 +157,7 @@ async def test_decision_pipeline_blocks_repeated_action(db_engine_and_session):
             if e.event_type == AuditEventType.ACTION_BLOCKED and e.decision == "BLOCKED"
         ]
         assert len(policy_audits) >= 1, "Expected a BLOCKED Policy Engine audit event"
+        audit = policy_audits[0]
         assert audit.decision == "BLOCKED"
         assert audit.reason == "POLICY_COOLDOWN_ACTIVE"
 

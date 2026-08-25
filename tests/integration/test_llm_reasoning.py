@@ -75,7 +75,7 @@ async def test_generate_explanation_timeout_raises_error():
         return ExplanationResult(narrative="Test", reason_codes=["TEST"])
     
     with patch("ai.inference.llm._call_llms", side_effect=slow_mock), \
-         patch("apps.api.config.settings.llm_provider", "openai"):
+         patch("config.settings.llm_provider", "openai"):
         with pytest.raises(LLMExplanationError) as exc:
             await generate_explanation(
                 amount_paise=1000,
@@ -96,7 +96,7 @@ async def test_llm_schema_validation_failure():
         raise ValueError("Invalid JSON")
     
     with patch("ai.inference.llm._call_llms", side_effect=bad_json_mock), \
-         patch("apps.api.config.settings.llm_provider", "openai"):
+         patch("config.settings.llm_provider", "openai"):
         with pytest.raises(LLMExplanationError) as exc:
             await generate_explanation(
                 amount_paise=1000,
