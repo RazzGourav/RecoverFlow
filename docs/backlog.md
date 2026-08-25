@@ -2,3 +2,19 @@
 
 ## Testing Hooks
 - `FORCE_ACTION_TYPE_FOR_TESTING`: This environment variable can be set to `1` to force the Policy Engine to select specific actions based on the ones digit of the amount_paise. This is a test-only override and must NEVER be enabled in a demo or production run.
+
+## Known Failing Tests (triaged 2026-08-25, branch `triage-pre-existing-failures`)
+Full suite: 8 failed / 64 passed / 22 errors. Triage found **no new production bugs** — every failure is test infrastructure or environment:
+
+### A. Missing shared DB fixtures (22 ERRORs)
+Tests request `db_session` / `setup_test_case` / `test_app` / `async_client` fixtures that were never added to `tests/conftest.py`. Affected files: `test_finance_executor.py` (7), `test_reconciliation.py` (4), `test_funnel.py` (2), `test_human_approval.py` (2), `test_2am_incident.py` (2), `test_action_layer.py` (2), `test_webhook_flow.py` (2), `test_leak_graph.py` (1).
+**Fix:** add one real-Postgres `db_session` + `setup_test_case` fixture pair to conftest (pattern already exists per-file in `test_decision_pipeline.py`). Safe to schedule post-demo.
+
+### B. Stale test bugs (3 FAILEDs)
+- `test_decision_pipeline_blocks_repeated_action`: asserts on undefined `audit` variable (leftover refactor). One-line fix.
+- `test_generate_explanation_timeout_raises_error` / `test_llm_schema_validation_failure`: patch `apps.api.config.settings.llm_provider`, but `ai/inference/llm.py` imports `config.settings` — patch never takes effect, provider stays `mock`, so nothing raises. Verified the production circuit breaker (`asyncio.wait_for` → `LLMExplanationError`) is correct; fix is patching `ai.inference.llm`'s view of settings.
+
+### C. Environment-dependent failures (demo-route modules, understood)
+- `test_replay_read_only_guarantee` / `test_simulate_compare_endpoint`: drive the real FastAPI app, which loads `.env`'s `DATABASE_URL=postgres:5432` (Docker-internal hostname) → DNS `gaierror` on host runs. Pass inside containers.
+- `test_simulation_read_only_guarantee`: flaky only in full-suite runs — counts Action/AuditEvent rows while the live Docker workers concurrently write to the shared Postgres, producing false "leak" detections. Passed 3/3 in isolation. Simulation-core nested-transaction isolation itself verified sound.
+
