@@ -123,13 +123,19 @@ async def razorpay_webhook(
         await db.rollback()
         logger.info("webhook.duplicate_ignored", external_event_id=event_id)
 
-        # Log to AuditEvents for Failure Center visibility
-        audit = AuditEvent(
-            event_type=AuditEventType.WEBHOOK_DUPLICATE_DROPPED,
-            context={"external_event_id": event_id, "event_type": event_type}
-        )
-        db.add(audit)
-        await db.commit()
+        # Log to AuditEvents for Failure Center visibility.
+        # Best-effort: a failure here must NOT turn the duplicate into a 500,
+        # or Razorpay would retry an event we have already correctly deduplicated.
+        try:
+            audit = AuditEvent(
+                event_type=AuditEventType.WEBHOOK_DUPLICATE_DROPPED,
+                context={"external_event_id": event_id, "event_type": event_type}
+            )
+            db.add(audit)
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            logger.warning("webhook.duplicate_audit_log_failed", external_event_id=event_id)
 
         return JSONResponse(status_code=status.HTTP_200_OK, content={"status": "duplicate"})
 
