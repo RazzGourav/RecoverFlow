@@ -3,6 +3,11 @@
 ## Testing Hooks
 - `FORCE_ACTION_TYPE_FOR_TESTING`: This environment variable can be set to `1` to force the Policy Engine to select specific actions based on the ones digit of the amount_paise. This is a test-only override and must NEVER be enabled in a demo or production run.
 
+## Benchmark Policy + Feature Parity (fixed 2026-08-26, branch `fix-benchmark-script-real-computation`)
+- **Permissive benchmark Policy retired.** Earlier benchmark runs seeded a Policy with `confidence_threshold=0.0` / review thresholds at ₹10L — values no real merchant sees. The benchmark now seeds the exact live defaults (`confidence_threshold=0.80`, ₹5k autonomous cap, ₹25k review threshold). Consequence: most cases legitimately route to AWAITING_HUMAN at these thresholds; that is reported as measured.
+- **Feature-parity bug fixed in `build_case_context()`** (domain/policies/pipeline.py): it previously hardcoded `segment="UNKNOWN"`, `tenure_days=0`, so every case through the live pipeline produced all-zero segment features regardless of Customer data. It now reads the Customer row (async-safe explicit fetch) and maps DB segments back to ML vocabulary via `metadata_["ml_segment"]` (stashed at ingest/seed time) or a deterministic enum fallback. The risk-firewall call now receives the same real segment/tenure instead of hardcoded placeholders. Verified by `scripts/check_benchmark_feature_parity.py`: pipeline-fed argmax distribution is byte-identical to the raw-CSV check_distribution path.
+- **RETRY dominance confirmed genuine** (not a benchmark-input artifact): with fully corrected features (39 NEW / 38 ESTABLISHED / 23 HIGH_VALUE, tenure mean 196.7d), the intervention model still ranks RETRY top for 100/100 held-out cases — identical to the raw-CSV cross-check. This is a model/training-data property; see evaluation/reports/final-benchmark.md.
+
 ## Known Failing Tests (triaged 2026-08-25, branch `triage-pre-existing-failures`)
 Full suite: 8 failed / 64 passed / 22 errors. Triage found **no new production bugs** — every failure is test infrastructure or environment:
 
