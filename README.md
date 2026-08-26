@@ -6,8 +6,7 @@
 
 ---
 
-## 🛑 The Problem: Reactive Revenue Leakage
-In the modern digital economy, failed payments are a silent killer of merchant revenue. Whether due to insufficient funds, network timeouts, or overzealous fraud filters, perfectly good transactions are blocked every second. 
+## 🛑 Problem Statement/ Theme
 
 Currently, merchants rely on **reactive retries** (dumbing hitting the payment gateway until it works) or **blind discounts**. These legacy systems lack context, treat all customers the same, and often run afoul of frequency limits or anger high-value users.
 
