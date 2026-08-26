@@ -14,7 +14,7 @@ type Case = {
   failure_type: string;
   risk_level: string;
   status: string;
-  expected_recovery_paise?: number; // Might not be from the API directly on the list endpoint, we will mock or compute it if missing, or use amount
+  expected_recovery_paise?: number | null;
 };
 
 export function CasesTable({ initialCases }: { initialCases: Case[] }) {
@@ -22,16 +22,8 @@ export function CasesTable({ initialCases }: { initialCases: Case[] }) {
   const [sortField, setSortField] = useState<"created_at" | "amount_paise" | "expected_recovery">("created_at");
   const [sortDesc, setSortDesc] = useState(true);
 
-  // Compute a dummy expected recovery for demo purposes if the API doesn't provide it on the list view
-  const casesWithExpected = useMemo(() => {
-    return initialCases.map(c => ({
-      ...c,
-      expected_recovery: c.expected_recovery_paise || (c.amount_paise * (c.risk_level === 'HIGH' ? 0.1 : 0.8))
-    }));
-  }, [initialCases]);
-
   const filteredCases = useMemo(() => {
-    return casesWithExpected.filter(c => {
+    return initialCases.filter(c => {
       if (filter === "ALL") return true;
       if (filter === "HIGH_VALUE") return c.amount_paise > 1000000; // > 10,000 INR
       if (filter === "HIGH_RISK") return c.risk_level === "HIGH";
@@ -41,12 +33,17 @@ export function CasesTable({ initialCases }: { initialCases: Case[] }) {
       if (filter === "HUMAN_REVIEW") return c.status === "HUMAN_REVIEW";
       return true;
     });
-  }, [casesWithExpected, filter]);
+  }, [initialCases, filter]);
 
   const sortedCases = useMemo(() => {
     return [...filteredCases].sort((a, b) => {
-      let valA = a[sortField === 'expected_recovery' ? 'expected_recovery' : sortField];
-      let valB = b[sortField === 'expected_recovery' ? 'expected_recovery' : sortField];
+      let valA = a[sortField === 'expected_recovery' ? 'expected_recovery_paise' : sortField];
+      let valB = b[sortField === 'expected_recovery' ? 'expected_recovery_paise' : sortField];
+
+      // Handle nulls by pushing them to the bottom
+      if (valA == null && valB != null) return sortDesc ? 1 : 1;
+      if (valA != null && valB == null) return sortDesc ? -1 : -1;
+      if (valA == null && valB == null) return 0;
       if (valA < valB) return sortDesc ? 1 : -1;
       if (valA > valB) return sortDesc ? -1 : 1;
       return 0;
@@ -153,7 +150,11 @@ export function CasesTable({ initialCases }: { initialCases: Case[] }) {
                       )}
                     </td>
                     <td className="px-6 py-4 text-right font-bold text-emerald-300 filter drop-shadow-[0_0_5px_rgba(52,211,153,0.3)]">
-                      ₹{(c.expected_recovery / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                      {c.expected_recovery_paise != null ? (
+                        `₹${(c.expected_recovery_paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+                      ) : (
+                        <span className="text-white/40 font-normal italic">Pending</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <span className={cn("px-3 py-1 rounded-full text-[11px] font-bold tracking-wider border", getStatusColor(c.status))}>

@@ -1,0 +1,47 @@
+{
+  "recoverability_distribution": {
+    "label": "Recoverability P(success) \u2014 Recovery XGBoost model",
+    "n": 100,
+    "min": 0.01570424623787403,
+    "p5": 0.06931224297732115,
+    "p10": 0.09729612916707993,
+    "p25": 0.17705237120389938,
+    "median": 0.38555677235126495,
+    "mean": 0.41877741446718575,
+    "p75": 0.6404020488262177,
+    "p90": 0.7946557581424714,
+    "p95": 0.8785373389720916,
+    "max": 0.9840170741081238,
+    "std": 0.2671175168478234,
+    "above_080": 9,
+    "pct_above_080": 9.0
+  },
+  "confidence_distribution": {
+    "label": "Confidence (best_prob) \u2014 Intervention Logistic model argmax",
+    "n": 100,
+    "min": 0.3342762997443632,
+    "p5": 0.3408912875946575,
+    "p10": 0.3478416826633729,
+    "p25": 0.35477559412558135,
+    "median": 0.47732505540443954,
+    "mean": 0.4994512464823246,
+    "p75": 0.555532017550016,
+    "p90": 0.7714880736139423,
+    "p95": 0.8343518430057083,
+    "max": 0.8913792004200158,
+    "std": 0.15845349186059476,
+    "above_080": 9,
+    "pct_above_080": 9.0
+  },
+  "retry_exhausted_summary": {
+    "n_cases": 100,
+    "total_value_paise": 122442073,
+    "give_up_ev_paise": 0,
+    "alt_ev_paise": 94568760,
+    "retry_ev_paise": 94746920,
+    "alt_pct_of_retry": 99.81196220927767,
+    "action_distribution": {
+      "PAYMENT_METHOD_UPDATE": 100
+    }
+  }
+}

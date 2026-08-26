@@ -84,7 +84,10 @@ async def list_cases(
     authorization_status: str | None = None,
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = select(RecoveryCase).options(selectinload(RecoveryCase.customer))
+    stmt = select(RecoveryCase).options(
+        selectinload(RecoveryCase.customer),
+        selectinload(RecoveryCase.candidate_actions)
+    )
     if status:
         stmt = stmt.where(RecoveryCase.status == status)
     if risk_level:
@@ -102,11 +105,14 @@ async def list_cases(
 
     res = []
     for c in cases:
+        best_action = next((a for a in c.candidate_actions if a.rank == 1), None)
+        expected_recovery = best_action.expected_value_paise if best_action else None
+
         res.append({
             "id": str(c.id),
             "status": c.status.value if hasattr(c.status, 'value') else c.status,
             "amount_paise": c.amount_paise,
-            "expected_recovery_paise": int(c.recoverability_score * c.amount_paise) if c.recoverability_score is not None else 0,
+            "expected_recovery_paise": expected_recovery,
             "failure_type": c.failure_type.value if hasattr(c.failure_type, 'value') else c.failure_type,
             "risk_level": (c.risk_level.value if hasattr(c.risk_level, 'value') else c.risk_level) if c.risk_level else None,
             "customer_segment": (c.customer.segment.value if hasattr(c.customer.segment, 'value') else c.customer.segment) if c.customer else None,
