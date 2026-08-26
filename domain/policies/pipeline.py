@@ -23,6 +23,7 @@ from db.models import (
     AuthorizationStatus,
     CandidateAction,
     CaseStatus,
+    Customer,
     ExecutionStatus,
     Policy,
     RecoveryCase,
@@ -38,15 +39,67 @@ from domain.risk.firewall import (
 )
 
 
-def build_case_context(case: RecoveryCase) -> dict[str, Any]:
-    """Helper to map a RecoveryCase to the raw dictionary expected by ML."""
-    # In a fully fleshed out system, we would join with Customer and Subscription here.
+def _db_segment_to_ml_segment(customer) -> str:
+    """Map a Customer's DB segment back to the ML-expected vocabulary.
+
+    The ML feature encoder (ai/features/engineer.py) recognises three segment
+    values: NEW, ESTABLISHED, HIGH_VALUE — the same values used in the training
+    CSV.  The DB ``CustomerSegment`` enum uses a different vocabulary
+    (HIGH_VALUE, MEDIUM_VALUE, LOW_VALUE, CHURNED).
+
+    Resolution order:
+      1. ``customer.metadata_["ml_segment"]`` — the authoritative original CSV
+         segment stashed at seed/ingest time.  Preferred.
+      2. Deterministic mapping from the DB enum:
+           HIGH_VALUE   → HIGH_VALUE  (direct match)
+           MEDIUM_VALUE → ESTABLISHED (best semantic proxy)
+           LOW_VALUE    → NEW         (best semantic proxy)
+           CHURNED      → NEW         (safest: low-tenure-like risk profile)
+      3. "UNKNOWN" — produces an all-zero one-hot, which is what the model saw
+         for genuinely uncategorised cases during training.
+    """
+    if customer is None:
+        return "UNKNOWN"
+
+    # 1. Prefer the original ML segment stashed in metadata
+    meta = getattr(customer, "metadata_", None) or {}
+    ml_seg = meta.get("ml_segment")
+    if ml_seg in ("NEW", "ESTABLISHED", "HIGH_VALUE"):
+        return ml_seg
+
+    # 2. Deterministic mapping from DB enum
+    db_val = customer.segment.value if hasattr(customer.segment, "value") else str(customer.segment)
+    return {
+        "HIGH_VALUE": "HIGH_VALUE",
+        "MEDIUM_VALUE": "ESTABLISHED",
+        "LOW_VALUE": "NEW",
+        "CHURNED": "NEW",
+    }.get(db_val, "UNKNOWN")
+
+
+def build_case_context(case: RecoveryCase, customer=None) -> dict[str, Any]:
+    """Helper to map a RecoveryCase to the raw dictionary expected by ML.
+
+    ``customer`` should be a loaded Customer ORM object (or None). Callers in
+    async contexts must pass it explicitly (or eagerly-load ``case.customer``)
+    — implicit lazy loading raises MissingGreenlet under asyncio.
+    """
+    if customer is None:
+        # Fallback: only safe when the relationship is already loaded.
+        customer = getattr(case, "customer", None)
+        from sqlalchemy import inspect as sa_inspect
+        state = sa_inspect(case)
+        if "customer" in state.unloaded:
+            customer = None  # never trigger a lazy load
+    segment = _db_segment_to_ml_segment(customer)
+    tenure_days = customer.tenure_days if customer and customer.tenure_days else 0
+
     return {
         "case_id": str(case.id),
         "amount_paise": case.amount_paise,
         "failure_type": case.failure_type.value if hasattr(case.failure_type, 'value') else str(case.failure_type),
-        "segment": "UNKNOWN",  # Default if no customer context
-        "tenure_days": 0,
+        "segment": segment,
+        "tenure_days": tenure_days,
         "high_frequency_contact": False,
         "requires_human_review": False
     }
@@ -107,7 +160,14 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase, force
         policy_version = policy.version
     
     # 2. Extract context & run AI (Phase 3)
-    case_context = build_case_context(case)
+    # Explicitly fetch the Customer (async-safe; never rely on lazy loading).
+    customer = None
+    if case.customer_id:
+        cust_res = await session.execute(
+            select(Customer).where(Customer.id == case.customer_id)
+        )
+        customer = cust_res.scalar_one_or_none()
+    case_context = build_case_context(case, customer=customer)
     # The analyze_case function evaluates all candidate actions and returns the best.
     # We actually want the probabilities for ALL actions to rank them, so we will 
     # directly call the models or extract from the contract.
@@ -168,9 +228,7 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase, force
         .limit(1)
     )
     last_action_time = last_action_res.scalar()
-    
-    print(f"DEBUG: last_action_time={last_action_time}, past_actions_count={past_actions_count}")
-    
+
     history_context = {
         "past_actions_count": past_actions_count,
         "last_action_time": last_action_time,
@@ -209,9 +267,9 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase, force
         autonomous_threshold_paise=policy_config.get("max_autonomous_amount_paise", 500_000),
         review_threshold_paise=policy_config.get("human_review_threshold_paise", 2_500_000),
         # Check 4 — Behavioral anomaly
-        tenure_days=0,           # Populated from Customer in a future phase
+        tenure_days=case_context["tenure_days"],
         typical_amount_paise=case.amount_paise,   # No historical data yet; use current
-        segment="UNKNOWN",
+        segment=case_context["segment"],
         # Check 5 — Policy violation
         action_type=best_candidate.action_type,
         allowed_action_types=[a.value for a in ActionType],  # Merchant's full allowlist

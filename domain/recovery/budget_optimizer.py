@@ -68,7 +68,20 @@ def optimize_budget(
             "ratio": ratio
         })
         
-    # Sort descending by ratio
+    # Sort descending by ratio, with deterministic tie-breakers (net gain, cost,
+    # expected recovery) so allocation is reproducible across runs regardless of
+    # input ordering. Candidates fully tied on all keys are interchangeable:
+    # swapping them cannot change aggregate funded EV or cost.
+    annotated_candidates.sort(
+        key=lambda x: (
+            -x["net_gain"],
+            x["cand"].action_cost_paise,
+            -x["cand"].expected_recovery_paise,
+        ),
+        reverse=False,
+    )
+    # Primary key: ratio descending. Re-sort stably by ratio so the tie-breaker
+    # order above is preserved within equal-ratio groups.
     annotated_candidates.sort(key=lambda x: x["ratio"], reverse=True)
     
     remaining_budget = budget_paise

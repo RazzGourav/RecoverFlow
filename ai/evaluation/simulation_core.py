@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from db.models import RecoveryCase, Action, ActionType, ExecutionStatus, AuthorizationStatus
 from domain.policies.pipeline import run_decision_pipeline
@@ -38,6 +39,17 @@ def get_action_cost(action_type: str, amount_paise: int) -> int:
     elif action_type == "DISCOUNT_10":
         return int(amount_paise * 0.10)
     return ACTION_COSTS.get(action_type, 0)
+
+# Composite baseline strategies mapped to the concrete ActionType the pipeline
+# executes for every case. These are real executable paths (not invented scores):
+#   - RETRY_PLUS_REMINDER: naive "always retry" policy -> RETRY arm, ₹0 cost.
+#   - DISCOUNT_5: blanket 5%-discount offer, modeled as an incentivized payment
+#     link (PAYMENT_LINK arm supplies the model probability; the cost is priced
+#     from the DISCOUNT_5 entry in ACTION_COSTS, i.e. 5% of transaction value).
+BASELINE_STRATEGY_FORCED_ACTION = {
+    "RETRY_PLUS_REMINDER": ActionType.RETRY,
+    "DISCOUNT_5": ActionType.PAYMENT_LINK,
+}
 
 class SimulationResult(BaseModel):
     strategy: str
@@ -87,8 +99,8 @@ async def simulate_strategy_batch(
 
     async with session.begin_nested() as nested:
         try:
-            # 1. Fetch cases
-            stmt = select(RecoveryCase).where(RecoveryCase.id.in_(case_ids))
+            # 1. Fetch cases (eager-load customer for build_case_context)
+            stmt = select(RecoveryCase).options(selectinload(RecoveryCase.customer)).where(RecoveryCase.id.in_(case_ids))
             result = await session.execute(stmt)
             cases = result.scalars().all()
             
@@ -105,7 +117,8 @@ async def simulate_strategy_batch(
                 predict.load_models()
                 candidates = []
                 for case in cases:
-                    context = build_case_context(case)
+                    # customer is eager-loaded with the case query above.
+                    context = build_case_context(case, customer=case.customer)
                     df = pd.DataFrame([context])
                     X_base = build_features(df)
                     
@@ -163,10 +176,15 @@ async def simulate_strategy_batch(
                     # Determine force_action
                     force_action = None
                     if strategy != "RECOVERFLOW_OPTIMAL":
-                        try:
-                            force_action = ActionType(strategy)
-                        except ValueError:
-                            force_action = ActionType.NO_ACTION
+                        if strategy in BASELINE_STRATEGY_FORCED_ACTION:
+                            force_action = BASELINE_STRATEGY_FORCED_ACTION[strategy]
+                        else:
+                            # Unknown strategy names must fail loudly, never silently
+                            # degrade to NO_ACTION (which would fabricate a comparison).
+                            raise ValueError(
+                                f"Unknown simulation strategy: {strategy!r}. "
+                                f"Valid strategies: RECOVERFLOW_OPTIMAL, {sorted(BASELINE_STRATEGY_FORCED_ACTION)}"
+                            )
                     else:
                         if case.id not in funded_cases:
                             force_action = ActionType.NO_ACTION
@@ -201,7 +219,13 @@ async def simulate_strategy_batch(
                         
                         prob = candidate.success_probability if candidate else 0.15 # fallback
                         ev = int(case.amount_paise * prob)
-                        cost = get_action_cost(action.action_type.value, case.amount_paise)
+                        # Composite baselines keep their OWN cost schema: DISCOUNT_5 is
+                        # priced at 5% of transaction value even though its executable
+                        # arm is PAYMENT_LINK (which alone would cost ₹0).
+                        if strategy in BASELINE_STRATEGY_FORCED_ACTION:
+                            cost = get_action_cost(strategy, case.amount_paise)
+                        else:
+                            cost = get_action_cost(action.action_type.value, case.amount_paise)
                         
                         total_expected_recovery += ev
                         total_cost += cost

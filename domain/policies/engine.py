@@ -61,9 +61,7 @@ def evaluate_action(
     # 2. Aggregate finding strictest outcome
     status = OUTCOME_AUTONOMOUS
     reason = "POLICY_CLEARED_AUTONOMOUS"
-    
-    print(f"DEBUG outcomes: {outcomes}")
-    
+
     for outcome_status, outcome_reason in outcomes:
         if outcome_status == OUTCOME_BLOCKED:
             # Short-circuit: nothing overrides a BLOCK
