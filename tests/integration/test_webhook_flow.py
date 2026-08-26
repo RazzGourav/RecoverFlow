@@ -154,7 +154,6 @@ async def test_e2e_queue_worker_picks_up_event(integration_client: AsyncClient, 
     (which should be running in docker-compose) picks it up and processes it.
     """
     import asyncio
-    from db.models import PaymentEventStatus
     
     _, TestingSessionLocal = db_engine_and_session
     settings.razorpay_webhook_secret = "REPLACE_ME"

@@ -33,8 +33,10 @@ The underlying domain logic for ML Inference, Risk Firewalls, and Policy executi
 - **Evidence:** The decision pipeline correctly orchestrates the AI recommendation and the Risk Firewall. The simulation core (`ai/evaluation/simulation_core.py`) heavily reuses this exact pipeline within a nested SQL transaction to guarantee zero side-effects.
 
 ### 6. Budget Optimizer Benchmark
-**Verdict:** HARDCODED (unlabeled — RED FLAG)
-- **Evidence:** The budget optimizer logic itself (`domain/recovery/budget_optimizer.py`) is real. However, the benchmark script used to generate the README metrics (`scripts/run_final_benchmark.py`) is completely faked. The script bypasses ML inference, hardcodes success probabilities (`0.75 if actually_recovered else 0.25`), invents a naive baseline (`naive_recovery = int(res_optimal.expected_recovery_paise * 0.7)`), and hardcodes perfect assertions for catch rate and funnel consistency as strings. 
+**Verdict:** WORKING (real, FIXED 2026-08-26)
+- **Previous Finding (fixed):** The original benchmark script bypassed ML inference and hardcoded success probabilities (`0.75 if actually_recovered else 0.25`). This has been fully rewritten.
+- **Current State:** `scripts/run_final_benchmark.py` now runs every case through the real ML inference → Risk Firewall → Policy Engine pipeline via `ai.evaluation.simulation_core`. The `seed_db.py` script also uses real ML probabilities. All three strategies (RETRY_PLUS_REMINDER, DISCOUNT_5, RECOVERFLOW_OPTIMAL) are computed independently through their own real logic paths. See `evaluation/reports/final-benchmark.md` for measured results.
+- **Grep confirmation:** Zero instances of `0.75 if ... else 0.25` remain in any benchmark or seeding path. 
 
 ### 7. Revenue Leak / Funnel Graph
 **Verdict:** WORKING (real)
@@ -105,4 +107,4 @@ The system was tested for out-of-the-box reproducibility by cloning the reposito
 
 ## Recommendations Before Demo Day
 1. **Fix the UI API Contract:** Update `apps/api/routes/cases.py` to return the real `expected_recovery_paise` from the ML layer, and remove the hardcoded math from the React frontend.
-2. **Rewrite the Benchmark Script:** If the budget optimizer is to be featured in the demo, rewrite `run_final_benchmark.py` to actually use the ML pipeline instead of hardcoded strings and fake data.
+2. ~~**Rewrite the Benchmark Script:**~~ DONE (2026-08-26). `run_final_benchmark.py` rewritten to use real ML pipeline. `seed_db.py` hardcoded probabilities replaced with real inference. README updated with measured numbers.

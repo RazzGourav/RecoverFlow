@@ -14,8 +14,6 @@ Method:
 Run with workers stopped; read-only w.r.t. any persistent store.
 """
 import asyncio
-import csv
-import os
 import sys
 from pathlib import Path
 

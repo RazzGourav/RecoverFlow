@@ -89,5 +89,25 @@ docker compose logs -f worker
 
 ---
 
+## 📊 Benchmark Results
+
+Measured on 100 held-out cases (`data/processed/test.csv`, fixed seed 42, deterministic Phase 2 synthetic data). Every number below is computed live by `scripts/run_final_benchmark.py` through the real ML inference → Risk Firewall → Policy Engine pipeline. No hardcoded probabilities or fabricated baselines.
+
+| Metric | Retry Baseline | Rules Baseline (5% Discount) | RecoverFlow (AI Optimal) |
+|---|---|---|---|
+| **Cases Processed** | 100 | 100 | 100 |
+| **Action Cost (₹)** | ₹0.00 | ₹61,220.58 | ₹0.00 |
+| **Expected Recovery (₹)** | ₹9,47,468.71 | ₹9,20,231.50 | ₹9,47,468.71 |
+| **Net Recovery (₹)** | ₹9,47,468.71 | ₹8,59,010.92 | ₹9,47,468.71 |
+
+**Result: TIE** — Retry Baseline and RecoverFlow (AI Optimal) both achieve ₹9,47,468.71 net recovery. The intervention model currently ranks RETRY as the top action for all 100 held-out cases due to its logistic regression architecture lacking interaction terms between failure type and action type (documented in `evaluation/reports/final-benchmark.md`). RecoverFlow's demonstrated value lies in its policy/firewall/validation/reconciliation safety layers, not in action-selection differentiation at this stage.
+
+**Sub-System Metrics:** Under live policy defaults (confidence threshold 0.80), 91 of 100 cases route to human review (policy working as designed). Zero permanent rows written during benchmark (read-only guarantee verified).
+
+> **Reproducibility:** `python scripts/run_final_benchmark.py` against a running Postgres instance produces identical numbers from any clone. See `tests/eval/test_benchmark_reproducibility.py`.
+
+---
+
 ## 📜 Architecture Diagram
 *(See [system-design.md](./system-design.md) for a comprehensive deep dive into the system's asynchronous architecture and data flows).*
+

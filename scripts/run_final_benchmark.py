@@ -65,7 +65,6 @@ from db.models import (
 )
 from ai.evaluation.simulation_core import (
     simulate_strategy_batch,
-    BASELINE_STRATEGY_FORCED_ACTION,
 )
 
 PROCESSED_DIR = root_dir / "data" / "processed"
@@ -313,7 +312,6 @@ async def measure_validation_and_reconciliation(session, meta):
 
 async def count_rows(session):
     """Raw row counts proving the whole benchmark wrote zero permanent rows."""
-    from sqlalchemy import func
     actions = (await session.execute(select_count(Action))).scalar()
     audits = (await session.execute(select_count(AuditEvent))).scalar()
     recons = (await session.execute(select_count(ReconciliationRecord))).scalar()
@@ -385,14 +383,14 @@ async def main():
         lines.append(f"**Test Set:** {meta['n_rows']} held-out cases (data/processed/test.csv, fixed seed {FIXED_SEED})")
         lines.append(f"**Total Value at Risk:** ₹{meta['total_value']/100:,.2f}")
         lines.append(f"**Budget Cap:** ₹{BUDGET_PAISE/100:,.2f}")
-        lines.append(f"**Policy:** live defaults (confidence 0.80 / ₹5k autonomous / ₹25k review) — "
+        lines.append("**Policy:** live defaults (confidence 0.80 / ₹5k autonomous / ₹25k review) — "
                      "same values as Policy Studio & seed data; no benchmark-only overrides")
         lines.append("")
         lines.append("## Strategy Comparison")
         lines.append("")
         lines.append("| Metric | Retry Baseline | Rules Baseline (5% Discount) | RecoverFlow (AI Optimal) |")
         lines.append("|---|---|---|---|")
-        lines.append(f"| **Strategy** | RETRY_PLUS_REMINDER | DISCOUNT_5 | RECOVERFLOW_OPTIMAL |")
+        lines.append("| **Strategy** | RETRY_PLUS_REMINDER | DISCOUNT_5 | RECOVERFLOW_OPTIMAL |")
         lines.append(f"| **Cases Processed** | {res_retry.cases_processed} | {res_disc.cases_processed} | {res_optimal.cases_processed} |")
         lines.append(f"| **Action Cost (₹)** | ₹{res_retry.cost_paise/100:,.2f} | ₹{res_disc.cost_paise/100:,.2f} | ₹{res_optimal.cost_paise/100:,.2f} |")
         lines.append(f"| **Expected Recovery (₹)** | ₹{res_retry.expected_recovery_paise/100:,.2f} | ₹{res_disc.expected_recovery_paise/100:,.2f} | ₹{res_optimal.expected_recovery_paise/100:,.2f} |")

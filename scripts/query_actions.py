@@ -2,7 +2,7 @@ import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
-from apps.api.db.models import Action, AuditEvent, ReconciliationRecord, RecoveryCase
+from apps.api.db.models import Action, ReconciliationRecord
 
 DATABASE_URL = "postgresql+asyncpg://recoverflow:recoverflow@localhost:5432/recoverflow"
 

@@ -7,6 +7,8 @@ Why this file exists:
   so that the local development and demo environments start from a known,
   realistic state. It wipes existing cases to ensure idempotency when called
   multiple times.
+
+  CandidateAction rows use real ML-model probabilities (not hardcoded labels).
 """
 
 import asyncio
@@ -20,7 +22,9 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "api"))
+root_dir = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(root_dir / "apps" / "api"))
+sys.path.insert(0, str(root_dir))
 
 from config import settings
 from db.models import (
@@ -36,11 +40,41 @@ from db.models import (
     Subscription,
 )
 
-PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
+PROCESSED_DIR = root_dir / "data" / "processed"
 TRAIN_CSV = PROCESSED_DIR / "train.csv"
 
 
-async def clear_database(session: AsyncSession):
+def _compute_real_success_probability(row: dict) -> float:
+    """Compute the intervention model's predicted success probability.
+
+    Uses the same feature engineering + model path as the live inference
+    engine (ai/inference/predict.py), eliminating all hardcoded labels.
+    """
+    import pandas as pd
+    from ai.features.engineer import ACTION_TYPES, build_features
+    from ai.inference import predict
+
+    predict.load_models()
+
+    case_data = {
+        "amount_paise": int(row["amount_paise"]),
+        "failure_type": row["failure_type"],
+        "segment": row["segment"],
+        "tenure_days": int(row["tenure_days"]),
+    }
+    df = pd.DataFrame([case_data])
+    X_base = build_features(df)
+
+    action = row["action_taken"]
+    X_action = X_base.copy()
+    for a in ACTION_TYPES:
+        X_action[f"action_{a}"] = 1 if a == action else 0
+
+    prob = float(predict._intervention_model.predict_proba(X_action)[0, 1])
+    return prob
+
+
+async def clear_database(session: AsyncSession) -> None:
     """Clear existing cases and dependencies so seed is idempotent."""
     await session.execute(delete(CandidateAction))
     await session.execute(delete(RecoveryCase))
@@ -52,7 +86,7 @@ async def clear_database(session: AsyncSession):
     print("Cleaned existing data.")
 
 
-async def seed():
+async def seed() -> None:
     if not TRAIN_CSV.exists():
         print("synthetic data not found. Run generate.py first.")
         return
@@ -70,7 +104,7 @@ async def seed():
         await session.flush()
 
         # 2. Read first 50 rows from train.csv
-        rows = []
+        rows: list[dict] = []
         with open(TRAIN_CSV, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for i, row in enumerate(reader):
@@ -106,8 +140,7 @@ async def seed():
             # 5. Create PaymentEvent
             failure_type = FailureType(row["failure_type"])
             ext_id = row["external_event_id"]
-            # A bit of a hack: if is_duplicate is 'True', we'll just skip creating a duplicate in the seed for now,
-            # or handle it nicely.
+            # Skip duplicates — they're for ML training, not DB seeding
             if row["is_duplicate"] == "True":
                 continue
 
@@ -122,7 +155,6 @@ async def seed():
             await session.flush()
 
             # 6. Create RecoveryCase
-            actually_recovered = row["actually_recovered"] == "True"
             case = RecoveryCase(
                 payment_event_id=event.id,
                 subscription_id=sub.id,
@@ -136,13 +168,14 @@ async def seed():
 
             event.recovery_case_id = case.id
 
-            # 7. Create CandidateAction (just picking the one it took as the top candidate)
+            # 7. Create CandidateAction — real ML probability, not hardcoded
             action_type = ActionType(row["action_taken"])
+            real_prob = _compute_real_success_probability(row)
             cand = CandidateAction(
                 case_id=case.id,
                 action_type=action_type,
-                success_probability=0.75 if actually_recovered else 0.25,
-                expected_value_paise=amount_paise,
+                success_probability=real_prob,
+                expected_value_paise=int(amount_paise * real_prob),
                 rank=1
             )
             session.add(cand)
@@ -153,3 +186,4 @@ async def seed():
 
 if __name__ == "__main__":
     asyncio.run(seed())
+

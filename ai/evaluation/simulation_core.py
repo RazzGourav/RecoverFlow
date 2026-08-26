@@ -17,7 +17,6 @@ from sqlalchemy.orm import selectinload
 
 from db.models import RecoveryCase, Action, ActionType, ExecutionStatus, AuthorizationStatus
 from domain.policies.pipeline import run_decision_pipeline
-from domain.finance.executor import execute_action
 from domain.recovery.budget_optimizer import optimize_budget, CandidateOptimizationInput
 
 logger = structlog.get_logger(__name__)
