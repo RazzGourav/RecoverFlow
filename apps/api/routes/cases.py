@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from db.models import Action, AuthorizationStatus, Customer, ExecutionStatus, RecoveryCase
+from db.models import Action, AuthorizationStatus, CaseStatus, Customer, ExecutionStatus, RecoveryCase
 from dependencies.db import get_db
 
 router = APIRouter()
@@ -16,22 +16,41 @@ class ApprovalResponse(BaseModel):
     action_id: str
 
 
-@router.post("/{action_id}/approve", response_model=ApprovalResponse)
-async def approve_action(action_id: uuid.UUID, request: Request, db: AsyncSession = Depends(get_db)):
+@router.post("/{id}/approve", response_model=ApprovalResponse)
+async def approve_action(id: uuid.UUID, request: Request, db: AsyncSession = Depends(get_db)):
     """
-    Approve an action that is AWAITING_HUMAN and enqueue it for execution.
+    Approve an action for a case that is AWAITING_APPROVAL and enqueue it for execution.
     """
-    stmt = select(Action).where(Action.id == action_id).with_for_update()
+    from db.models import AuditEvent, AuditEventType
+
+    # Find the case and its pending action
+    stmt = select(RecoveryCase).options(
+        selectinload(RecoveryCase.actions)
+    ).where(RecoveryCase.id == id).with_for_update()
     result = await db.execute(stmt)
-    action = result.scalar_one_or_none()
+    case = result.scalar_one_or_none()
 
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    action = next((a for a in case.actions if a.authorization_status == AuthorizationStatus.AWAITING_HUMAN), None)
     if not action:
-        raise HTTPException(status_code=404, detail="Action not found")
+        raise HTTPException(status_code=400, detail="No action is awaiting human approval for this case.")
 
-    if action.authorization_status != AuthorizationStatus.AWAITING_HUMAN:
-        raise HTTPException(status_code=400, detail=f"Action is not awaiting human approval (current status: {action.authorization_status})")
-
+    # Update states
     action.authorization_status = AuthorizationStatus.APPROVED
+    case.status = CaseStatus.ACTION_INITIATED
+
+    # Write Audit Log
+    audit = AuditEvent(
+        case_id=case.id,
+        event_type=AuditEventType.HUMAN_APPROVED,
+        decision="APPROVED",
+        reason="Manually approved by human operator.",
+        context={"action_id": str(action.id), "action_type": action.action_type.value, "operator": "admin@recoverflow.ai"}
+    )
+    db.add(audit)
+    
     await db.commit()
 
     # Enqueue execution
@@ -54,23 +73,40 @@ async def approve_action(action_id: uuid.UUID, request: Request, db: AsyncSessio
     return ApprovalResponse(status="approved", action_id=str(action.id))
 
 
-@router.post("/{action_id}/reject", response_model=ApprovalResponse)
-async def reject_action(action_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+@router.post("/{id}/reject", response_model=ApprovalResponse)
+async def reject_action(id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """
-    Reject an action that is AWAITING_HUMAN.
+    Reject an action for a case that is AWAITING_APPROVAL.
     """
-    stmt = select(Action).where(Action.id == action_id).with_for_update()
+    from db.models import AuditEvent, AuditEventType, CaseStatus
+
+    stmt = select(RecoveryCase).options(
+        selectinload(RecoveryCase.actions)
+    ).where(RecoveryCase.id == id).with_for_update()
     result = await db.execute(stmt)
-    action = result.scalar_one_or_none()
+    case = result.scalar_one_or_none()
 
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    action = next((a for a in case.actions if a.authorization_status == AuthorizationStatus.AWAITING_HUMAN), None)
     if not action:
-        raise HTTPException(status_code=404, detail="Action not found")
-
-    if action.authorization_status != AuthorizationStatus.AWAITING_HUMAN:
-        raise HTTPException(status_code=400, detail=f"Action is not awaiting human approval (current status: {action.authorization_status})")
+        raise HTTPException(status_code=400, detail="No action is awaiting human approval for this case.")
 
     action.authorization_status = AuthorizationStatus.BLOCKED
     action.execution_status = ExecutionStatus.CANCELLED
+    case.status = CaseStatus.SUPPRESSED
+
+    # Write Audit Log
+    audit = AuditEvent(
+        case_id=case.id,
+        event_type=AuditEventType.ACTION_BLOCKED,
+        decision="REJECTED",
+        reason="Manually rejected by human operator.",
+        context={"action_id": str(action.id), "action_type": action.action_type.value, "operator": "admin@recoverflow.ai"}
+    )
+    db.add(audit)
+
     await db.commit()
 
     return ApprovalResponse(status="rejected", action_id=str(action.id))
@@ -173,7 +209,6 @@ async def get_case(case_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
                 "action_type": a.action_type.value if hasattr(a.action_type, 'value') else a.action_type,
                 "authorization_status": a.authorization_status.value if hasattr(a.authorization_status, 'value') else a.authorization_status,
                 "execution_status": a.execution_status.value if hasattr(a.execution_status, 'value') else a.execution_status,
-                "cost_estimate_paise": a.cost_estimate_paise,
                 "created_at": a.created_at.isoformat()
             } for a in sorted(c.actions, key=lambda x: x.created_at, reverse=True)
         ],
