@@ -209,6 +209,7 @@ async def get_case(case_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
                 "action_type": a.action_type.value if hasattr(a.action_type, 'value') else a.action_type,
                 "authorization_status": a.authorization_status.value if hasattr(a.authorization_status, 'value') else a.authorization_status,
                 "execution_status": a.execution_status.value if hasattr(a.execution_status, 'value') else a.execution_status,
+                "provider_reference": a.provider_reference,
                 "created_at": a.created_at.isoformat()
             } for a in sorted(c.actions, key=lambda x: x.created_at, reverse=True)
         ],
