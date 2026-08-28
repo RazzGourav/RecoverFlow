@@ -48,6 +48,9 @@ def get_action_cost(action_type: str, amount_paise: int) -> int:
 BASELINE_STRATEGY_FORCED_ACTION = {
     "RETRY_PLUS_REMINDER": ActionType.RETRY,
     "DISCOUNT_5": ActionType.PAYMENT_LINK,
+    "DISCOUNT_10": ActionType.PAYMENT_LINK,
+    "REMINDER_ONLY": ActionType.REMINDER,
+    "DO_NOTHING": ActionType.NO_ACTION,
 }
 
 class SimulationResult(BaseModel):

@@ -95,17 +95,19 @@ async def trigger_2am_incident():
     """
     import subprocess
     import time
+    from config import settings
 
     test_id = f"dup_test_{int(time.time())}"
+    secret = settings.razorpay_webhook_secret
 
     # 1. Duplicate Webhook
     # First request
-    subprocess.run(["python", "/app/scripts/simulate_webhook.py", "--id", test_id], capture_output=True)
+    subprocess.run(["python", "/app/scripts/simulate_webhook.py", "--id", test_id, "--secret", secret], capture_output=True)
     # Second request hits idempotency layer and drops
-    subprocess.run(["python", "/app/scripts/simulate_webhook.py", "--id", test_id], capture_output=True)
+    subprocess.run(["python", "/app/scripts/simulate_webhook.py", "--id", test_id, "--secret", secret], capture_output=True)
 
     # 2. Action Timeout
     # Mock provider sleeps for 20s if customer name contains "timeout"
-    subprocess.run(["python", "/app/scripts/simulate_webhook.py", "--customer-name", "timeout_test_user"], capture_output=True)
+    subprocess.run(["python", "/app/scripts/simulate_webhook.py", "--customer-name", "timeout_test_user", "--secret", secret], capture_output=True)
 
     return {"status": "incident_triggered", "message": "The 2AM incident scenario has been dispatched."}

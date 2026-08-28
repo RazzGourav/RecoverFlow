@@ -79,3 +79,11 @@ jobs:
 
       - name: TypeScript typecheck
         run: npm run typecheck
+
+      - name: Next.js production build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+
+      - name: Frontend tests
+        run: npm test -- --run

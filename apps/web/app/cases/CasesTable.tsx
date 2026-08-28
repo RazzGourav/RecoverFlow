@@ -36,14 +36,33 @@ export function CasesTable({ initialCases }: { initialCases: Case[] }) {
   }, [initialCases, filter]);
 
   const sortedCases = useMemo(() => {
-    return [...filteredCases].sort((a, b) => {
-      let valA = a[sortField === 'expected_recovery' ? 'expected_recovery_paise' : sortField];
-      let valB = b[sortField === 'expected_recovery' ? 'expected_recovery_paise' : sortField];
+    /**
+     * Returns a numeric sort key for the given case and sort field.
+     * Null/undefined expected_recovery_paise maps to -Infinity so nulls
+     * always sort to the bottom (after real values) in both asc and desc order.
+     * For date fields we use getTime(); for numeric fields the raw paise value.
+     */
+    const getSortValue = (c: Case, field: typeof sortField): number => {
+      if (field === "expected_recovery") {
+        const v = c.expected_recovery_paise;
+        return v != null ? v : -Infinity;
+      }
+      if (field === "amount_paise") {
+        return c.amount_paise;
+      }
+      // field === "created_at"
+      return new Date(c.created_at).getTime();
+    };
 
-      // Handle nulls by pushing them to the bottom
-      if (valA == null && valB != null) return sortDesc ? 1 : 1;
-      if (valA != null && valB == null) return sortDesc ? -1 : -1;
-      if (valA == null && valB == null) return 0;
+    return [...filteredCases].sort((a, b) => {
+      const valA = getSortValue(a, sortField);
+      const valB = getSortValue(b, sortField);
+
+      // Nulls (represented as -Infinity) always sort to the bottom
+      if (valA === -Infinity && valB !== -Infinity) return 1;
+      if (valA !== -Infinity && valB === -Infinity) return -1;
+      if (valA === -Infinity && valB === -Infinity) return 0;
+
       if (valA < valB) return sortDesc ? 1 : -1;
       if (valA > valB) return sortDesc ? -1 : 1;
       return 0;

@@ -53,7 +53,13 @@ describe('CasesTable', () => {
     ];
 
     render(<CasesTable initialCases={cases} />);
-    
-    expect(screen.getByText('Pending')).toBeDefined();
+
+    // Multiple elements contain "Pending" (the filter button + the table cell).
+    // The table cell renders as an italic <span> — verify it exists.
+    const pendingElements = screen.getAllByText('Pending');
+    const italicPending = pendingElements.find(
+      (el) => el.tagName === 'SPAN' && el.classList.contains('italic'),
+    );
+    expect(italicPending).toBeDefined();
   });
 });

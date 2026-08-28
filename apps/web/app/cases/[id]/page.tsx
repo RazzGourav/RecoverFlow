@@ -9,8 +9,13 @@ export const metadata: Metadata = {
 };
 
 async function getCase(id: string) {
+  // INTERNAL_API_URL is set in docker-compose for server-to-server calls.
+  const apiBase =
+    process.env.INTERNAL_API_URL ??
+    process.env.NEXT_PUBLIC_API_URL ??
+    "http://api:8000";
   try {
-    const res = await fetch(`http://api:8000/cases/${id}`, { cache: "no-store" });
+    const res = await fetch(`${apiBase}/cases/${id}`, { cache: "no-store" });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error("Failed to fetch case");
     return res.json();
