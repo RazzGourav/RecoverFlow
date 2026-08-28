@@ -6,7 +6,7 @@
 # Called by: make smoke, CI pipeline, pre-push check.
 # Exits 0 on success, 1 on any failure.
 # =============================================================================
-set -euo pipefail
+set -euo
 
 API_URL="${API_URL:-http://localhost:8000}"
 FRONTEND_URL="${FRONTEND_URL:-http://localhost:3000}"

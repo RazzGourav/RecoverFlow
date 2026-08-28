@@ -136,7 +136,6 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase, force
     policy = result.scalars().first()
     
     if not policy:
-        import structlog
         structlog.get_logger(__name__).warning("No active policy found. Using default system policy.")
         policy_config = {
             "max_autonomous_amount_paise": 500_000,
@@ -402,7 +401,6 @@ async def run_decision_pipeline(session: AsyncSession, case: RecoveryCase, force
             await pool.enqueue_job("dispatch_action_job", action_id=str(action.id), _queue_name="arq:recovery_queue")
             await pool.close()
         except Exception as e:
-            import structlog
             logger = structlog.get_logger(__name__)
             logger.error("pipeline.enqueue_action.failed", action_id=str(action.id), error=str(e))
             # Safe to ignore; the recovery_worker cron job will pick up any PENDING actions automatically.

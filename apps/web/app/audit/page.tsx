@@ -7,9 +7,14 @@ export const metadata: Metadata = {
 };
 
 async function getAuditLog(searchParams: any) {
+  // INTERNAL_API_URL is set in docker-compose for server-to-server calls.
+  const apiBase =
+    process.env.INTERNAL_API_URL ??
+    process.env.NEXT_PUBLIC_API_URL ??
+    "http://api:8000";
   try {
     const params = new URLSearchParams(searchParams);
-    const res = await fetch(`http://api:8000/audit?${params.toString()}`, { cache: "no-store" });
+    const res = await fetch(`${apiBase}/audit?${params.toString()}`, { cache: "no-store" });
     if (!res.ok) return [];
     return res.json();
   } catch (e) {

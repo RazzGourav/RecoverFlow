@@ -12,7 +12,7 @@ export default function PolicyStudioPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    fetch("/api/policies")
+    fetch("/api/policies/")
       .then(res => res.json())
       .then(data => {
         setPolicy(data);

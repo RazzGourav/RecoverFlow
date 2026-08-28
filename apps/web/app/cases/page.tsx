@@ -8,9 +8,15 @@ export const metadata: Metadata = {
 };
 
 async function getCases(searchParams: any) {
+  // INTERNAL_API_URL is set in docker-compose for server-to-server calls.
+  // Falls back to api:8000 (Docker default) or localhost for local dev.
+  const apiBase =
+    process.env.INTERNAL_API_URL ??
+    process.env.NEXT_PUBLIC_API_URL ??
+    "http://api:8000";
   try {
     const params = new URLSearchParams(searchParams);
-    const res = await fetch(`http://api:8000/cases?${params.toString()}`, { cache: "no-store" });
+    const res = await fetch(`${apiBase}/cases?${params.toString()}`, { cache: "no-store" });
     if (!res.ok) return [];
     return res.json();
   } catch (e) {

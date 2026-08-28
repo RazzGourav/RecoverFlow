@@ -10,6 +10,7 @@ export default function FailuresPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [triggering, setTriggering] = useState(false);
 
   const loadFailures = async () => {
@@ -30,16 +31,22 @@ export default function FailuresPage() {
 
   const handleTriggerIncident = async () => {
     setTriggering(true);
+    setError(null);
+    setSuccess(null);
     try {
       const res = await fetch("/api/audit/trigger-incident", {
         method: "POST"
       });
       if (!res.ok) throw new Error("Failed to trigger incident");
       
+      const body = await res.json();
+      setSuccess(body.message || "Incident triggered successfully.");
+      
       // Wait a moment for background script to generate records
       setTimeout(() => {
         loadFailures();
         setTriggering(false);
+        setTimeout(() => setSuccess(null), 5000);
       }, 2000);
 
     } catch (e: any) {
@@ -84,6 +91,13 @@ export default function FailuresPage() {
         <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 flex items-center gap-3 shrink-0 mb-6">
           <AlertOctagon className="w-5 h-5" />
           <strong>Error:</strong> {error}
+        </div>
+      )}
+      
+      {success && (
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 flex items-center gap-3 shrink-0 mb-6">
+          <Activity className="w-5 h-5" />
+          <strong>Success:</strong> {success}
         </div>
       )}
 
