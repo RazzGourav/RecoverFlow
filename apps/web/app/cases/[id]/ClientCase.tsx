@@ -1,13 +1,54 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowLeft, Play, ShieldAlert, Sparkles, Target, Activity, CheckCircle2, CircleDollarSign, AlertCircle, RefreshCcw, Lock } from "lucide-react";
+import { ArrowLeft, Play, ShieldAlert, Sparkles, Target, Activity, CheckCircle2, CircleDollarSign, AlertCircle, RefreshCcw, Lock, UserCheck, XCircle, ExternalLink } from "lucide-react";
 import { cn } from "../../components/utils";
+import { ProviderBadge } from "../../components/DataSourceBadge";
 
 export function ClientCase({ caseData }: { caseData: any }) {
+  const router = useRouter();
+  const [isApproving, setIsApproving] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+
   const hasLLM = !!caseData.llm_explanation;
   
+  const awaitingHumanAction = caseData.actions?.find((a: any) => a.authorization_status === "AWAITING_HUMAN");
+
+  const handleApprove = async () => {
+    setIsApproving(true);
+    try {
+      const res = await fetch(`/api/cases/${caseData.id}/approve`, { method: "POST" });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        console.error("Failed to approve");
+        setIsApproving(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setIsApproving(false);
+    }
+  };
+
+  const handleReject = async () => {
+    setIsRejecting(true);
+    try {
+      const res = await fetch(`/api/cases/${caseData.id}/reject`, { method: "POST" });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        console.error("Failed to reject");
+        setIsRejecting(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setIsRejecting(false);
+    }
+  };
+
   // Find specific events for the pipeline visualization
   const validationEvent = caseData.audit_events?.find((e: any) => e.event_type === "VALIDATION_BLOCKED" || e.event_type === "ACTION_EXECUTED");
   const optimizerEvent = caseData.audit_events?.find((e: any) => e.event_type === "BUDGET_EXHAUSTED" || e.event_type === "ACTION_APPROVED");
@@ -150,17 +191,48 @@ export function ClientCase({ caseData }: { caseData: any }) {
       bgGlow: getStatusColorHex(caseData.status).bg,
       borderColor: getStatusColorHex(caseData.status).border,
       content: (
-        <div className="mt-3 flex items-center justify-between bg-black/20 p-4 rounded-xl border border-white/5">
-          <div>
-            <p className="text-xs text-white/50 mb-1">Final Status</p>
-            <span className={cn("px-3 py-1 rounded-full text-xs font-bold border", getStatusColorClass(caseData.status))}>
-              {caseData.status}
-            </span>
+        <div className="mt-3 space-y-3">
+          <div className="flex items-center justify-between bg-black/20 p-4 rounded-xl border border-white/5">
+            <div>
+              <p className="text-xs text-white/50 mb-1">Final Status</p>
+              <span className={cn("px-3 py-1 rounded-full text-xs font-bold border", getStatusColorClass(caseData.status))}>
+                {caseData.status}
+              </span>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <ProviderBadge />
+              {reconciliationEvent && (
+                <div className="text-right">
+                  <p className="text-xs text-rose-400 mb-1">Reconciliation Exception</p>
+                  <p className="text-xs text-white/50 w-48 truncate">{reconciliationEvent.reason}</p>
+                </div>
+              )}
+            </div>
           </div>
-          {reconciliationEvent && (
-            <div className="text-right">
-              <p className="text-xs text-rose-400 mb-1">Reconciliation Exception</p>
-              <p className="text-xs text-white/50 w-48 truncate">{reconciliationEvent.reason}</p>
+          {/* Provider Reference — the payment link ID / retry ref returned by the provider */}
+          {caseData.actions?.some((a: any) => a.provider_reference) && (
+            <div className="bg-black/20 rounded-xl border border-white/5 p-4">
+              <p className="text-xs text-white/40 mb-2 uppercase tracking-wider font-semibold">Provider Reference</p>
+              {caseData.actions
+                .filter((a: any) => a.provider_reference)
+                .map((a: any) => (
+                  <div key={a.id} className="flex items-center gap-2">
+                    <span className="text-xs text-white/40 shrink-0">{a.action_type}:</span>
+                    {a.provider_reference?.startsWith("http") ? (
+                      <a
+                        href={a.provider_reference}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-mono text-[#06b6d4] hover:underline flex items-center gap-1"
+                      >
+                        {a.provider_reference}
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    ) : (
+                      <span className="text-sm font-mono text-white/70">{a.provider_reference}</span>
+                    )}
+                  </div>
+                ))}
             </div>
           )}
         </div>
@@ -198,6 +270,51 @@ export function ClientCase({ caseData }: { caseData: any }) {
           </Link>
         </div>
       </header>
+
+      {awaitingHumanAction && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-12 bg-orange-500/10 border-2 border-orange-500/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(249,115,22,0.1)] relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <UserCheck className="w-32 h-32 text-orange-500" />
+          </div>
+          
+          <div className="relative z-10 flex flex-col md:flex-row gap-6 md:items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <ShieldAlert className="w-6 h-6 text-orange-400" />
+                <h2 className="text-xl font-bold text-orange-400 tracking-tight">Human Approval Required</h2>
+              </div>
+              <p className="text-white/70 max-w-2xl leading-relaxed">
+                The AI Policy Engine has flagged this case for human review because it triggered a threshold 
+                (e.g., high value transaction or specific failure type). Please review the details below 
+                before authorizing the recovery action.
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-4 shrink-0">
+              <button 
+                onClick={handleReject}
+                disabled={isApproving || isRejecting}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isRejecting ? <RefreshCcw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                Reject Action
+              </button>
+              <button 
+                onClick={handleApprove}
+                disabled={isApproving || isRejecting}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold bg-emerald-500 text-black hover:bg-emerald-400 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isApproving ? <RefreshCcw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                Authorize Action
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Vertical Pipeline */}
       <div className="relative">
