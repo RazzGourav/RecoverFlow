@@ -201,14 +201,73 @@ export function ClientCase({ caseData }: { caseData: any }) {
             </div>
             <div className="flex flex-col items-end gap-1">
               <ProviderBadge />
-              {reconciliationEvent && (
-                <div className="text-right">
-                  <p className="text-xs text-rose-400 mb-1">Reconciliation Exception</p>
-                  <p className="text-xs text-white/50 w-48 truncate">{reconciliationEvent.reason}</p>
-                </div>
-              )}
             </div>
           </div>
+          
+          {/* Explicit Reconciliation Block */}
+          {caseData.reconciliation_records && caseData.reconciliation_records.length > 0 && (
+            (() => {
+              const latestRec = caseData.reconciliation_records[0];
+              const isMatched = latestRec.status === "MATCHED";
+              const isException = latestRec.status === "EXCEPTION";
+              const isPartial = latestRec.status === "PARTIAL";
+              
+              return (
+                <div className={cn(
+                  "p-4 rounded-xl border border-white/10",
+                  isMatched && "bg-emerald-500/10 border-emerald-500/30",
+                  isException && "bg-rose-500/10 border-rose-500/30",
+                  isPartial && "bg-amber-500/10 border-amber-500/30",
+                  !isMatched && !isException && !isPartial && "bg-blue-500/10 border-blue-500/30"
+                )}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Activity className={cn(
+                      "w-4 h-4",
+                      isMatched && "text-emerald-400",
+                      isException && "text-rose-400",
+                      isPartial && "text-amber-400",
+                      !isMatched && !isException && !isPartial && "text-blue-400"
+                    )} />
+                    <h4 className={cn(
+                      "text-sm font-bold uppercase tracking-wider",
+                      isMatched && "text-emerald-400",
+                      isException && "text-rose-400",
+                      isPartial && "text-amber-400",
+                      !isMatched && !isException && !isPartial && "text-blue-400"
+                    )}>
+                      Reconciliation: {latestRec.status}
+                    </h4>
+                  </div>
+                  
+                  {isMatched && (
+                    <p className="text-sm text-emerald-200/80">
+                      ₹{(latestRec.actual_amount_paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })} verified recovered. Amount matches expectation perfectly.
+                    </p>
+                  )}
+                  {isPartial && (
+                    <p className="text-sm text-amber-200/80">
+                      Partial match: Expected ₹{(latestRec.expected_amount_paise / 100).toLocaleString('en-IN')}, but only verified ₹{((latestRec.actual_amount_paise || 0) / 100).toLocaleString('en-IN')} recovered.
+                    </p>
+                  )}
+                  {isException && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-rose-200/80">
+                        Mismatch detected between execution and verified capture.
+                      </p>
+                      <p className="text-xs text-rose-400/80 italic bg-rose-950/30 p-2 rounded border border-rose-500/20">
+                        {latestRec.exception_reason || "Unknown exception"}
+                      </p>
+                    </div>
+                  )}
+                  {!isMatched && !isException && !isPartial && (
+                    <p className="text-sm text-blue-200/80">
+                      Reconciliation is {latestRec.status.toLowerCase()}.
+                    </p>
+                  )}
+                </div>
+              );
+            })()
+          )}
           {/* Provider Reference — the payment link ID / retry ref returned by the provider */}
           {caseData.actions?.some((a: any) => a.provider_reference) && (
             <div className="bg-black/20 rounded-xl border border-white/5 p-4">

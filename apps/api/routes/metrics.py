@@ -50,7 +50,7 @@ async def get_metrics(db: AsyncSession = Depends(get_db)):
 
     recovery_rate = 0.0
     if total_expected > 0:
-        recovery_rate = (recovered_revenue / total_expected) * 100.0
+        recovery_rate = (float(recovered_revenue) / float(total_expected)) * 100.0
 
     # 3. Reconciliation Exception Rate
     total_records_stmt = select(func.count(ReconciliationRecord.id))
@@ -65,7 +65,7 @@ async def get_metrics(db: AsyncSession = Depends(get_db)):
 
     exception_rate = 0.0
     if total_records > 0:
-        exception_rate = (exceptions / total_records) * 100.0
+        exception_rate = (float(exceptions) / float(total_records)) * 100.0
 
     # 4. Total Revenue at Risk
     risk_stmt = select(func.sum(RecoveryCase.amount_paise)).where(

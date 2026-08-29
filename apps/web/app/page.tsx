@@ -202,7 +202,7 @@ export default function RevenueControlTower() {
                       <div className="flex items-center gap-2">
                         {c.status === 'RECOVERED' ? (
                           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                        ) : c.status === 'FAILED' || c.status === 'UNRECOVERABLE' ? (
+                        ) : c.status === 'SUPPRESSED' || c.status === 'UNRECOVERABLE' ? (
                           <AlertCircle className="w-4 h-4 text-rose-400" />
                         ) : (
                           <RefreshCcw className="w-4 h-4 text-brand-400" />
@@ -258,10 +258,12 @@ function MetricCard({ title, value, icon, color, bgGlow }: { title: string; valu
 function getStatusColor(status: string) {
   switch (status) {
     case 'RECOVERED': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-    case 'PENDING': 
-    case 'EXECUTING': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
-    case 'HUMAN_REVIEW': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
-    case 'FAILED': 
+    case 'OPEN':
+    case 'ANALYZING':
+    case 'ACTION_INITIATED':
+    case 'VERIFYING': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+    case 'AWAITING_APPROVAL': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+    case 'SUPPRESSED':
     case 'UNRECOVERABLE': return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
     default: return 'bg-white/5 text-white/60 border-white/10';
   }

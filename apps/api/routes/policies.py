@@ -18,7 +18,7 @@ class PolicyUpdate(BaseModel):
     confidence_threshold: float
     human_review_threshold_paise: int
 
-@router.get("/", response_model=dict[str, Any])
+@router.get("", response_model=dict[str, Any])
 async def get_policy(db: AsyncSession = Depends(get_db)):
     """
     Get the global policy configuration.
