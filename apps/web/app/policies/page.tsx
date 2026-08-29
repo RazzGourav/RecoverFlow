@@ -12,7 +12,8 @@ export default function PolicyStudioPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    fetch("/api/policies/")
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    fetch(`${apiUrl}/policies/`)
       .then(res => res.json())
       .then(data => {
         setPolicy(data);
@@ -31,7 +32,8 @@ export default function PolicyStudioPage() {
     setMessage("");
 
     try {
-      const res = await fetch(`/api/policies/${policy.id}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/policies/${policy.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

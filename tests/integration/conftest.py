@@ -18,10 +18,12 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
+import os
+
 # ─── Connection ──────────────────────────────────────────────────────────────
 # Connects to the real Postgres instance started by docker-compose.
 # When running tests locally (outside Docker), the host-mapped port 5432 is used.
-TEST_DATABASE_URL = "postgresql+asyncpg://recoverflow:recoverflow@localhost:5432/recoverflow"
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "postgresql+asyncpg://recoverflow:recoverflow@localhost:5432/recoverflow")
 
 # ─── Session fixture ─────────────────────────────────────────────────────────
 
