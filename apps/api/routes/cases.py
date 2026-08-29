@@ -164,7 +164,8 @@ async def get_case(case_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         selectinload(RecoveryCase.payment_event),
         selectinload(RecoveryCase.candidate_actions),
         selectinload(RecoveryCase.actions),
-        selectinload(RecoveryCase.audit_events)
+        selectinload(RecoveryCase.audit_events),
+        selectinload(RecoveryCase.reconciliation_records)
     ).where(RecoveryCase.id == case_id)
 
     result = await db.execute(stmt)
@@ -222,5 +223,17 @@ async def get_case(case_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
                 "context": ae.context,
                 "timestamp": ae.timestamp.isoformat()
             } for ae in sorted(c.audit_events, key=lambda x: x.timestamp)
+        ],
+        "reconciliation_records": [
+            {
+                "id": str(r.id),
+                "action_id": str(r.action_id),
+                "expected_amount_paise": r.expected_amount_paise,
+                "actual_amount_paise": r.actual_amount_paise,
+                "status": r.status.value if hasattr(r.status, 'value') else r.status,
+                "exception_reason": r.exception_reason,
+                "created_at": r.created_at.isoformat(),
+                "updated_at": r.updated_at.isoformat()
+            } for r in sorted(c.reconciliation_records, key=lambda x: x.created_at, reverse=True)
         ]
     }
