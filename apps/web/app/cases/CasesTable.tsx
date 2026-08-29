@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUpDown, Search, Filter, AlertTriangle, CheckCircle2, AlertCircle, Clock, ShieldAlert, User, ShieldCheck } from "lucide-react";
@@ -18,7 +19,15 @@ type Case = {
 };
 
 export function CasesTable({ initialCases }: { initialCases: Case[] }) {
-  const [filter, setFilter] = useState<string>("ALL");
+  const searchParams = useSearchParams();
+  const filterParam = searchParams?.get("filter")?.toUpperCase() || "ALL";
+  const [filter, setFilter] = useState<string>(filterParam);
+  
+  useEffect(() => {
+    const urlFilter = searchParams?.get("filter")?.toUpperCase();
+    if (urlFilter) setFilter(urlFilter);
+  }, [searchParams]);
+
   const [sortField, setSortField] = useState<"created_at" | "amount_paise" | "expected_recovery">("created_at");
   const [sortDesc, setSortDesc] = useState(true);
 
@@ -27,10 +36,10 @@ export function CasesTable({ initialCases }: { initialCases: Case[] }) {
       if (filter === "ALL") return true;
       if (filter === "HIGH_VALUE") return c.amount_paise > 1000000; // > 10,000 INR
       if (filter === "HIGH_RISK") return c.risk_level === "HIGH";
-      if (filter === "PENDING") return c.status === "PENDING" || c.status === "EXECUTING";
-      if (filter === "BLOCKED") return c.status === "BLOCKED" || c.status === "UNRECOVERABLE";
+      if (filter === "PENDING") return ["OPEN", "ANALYZING", "ACTION_INITIATED", "VERIFYING"].includes(c.status);
+      if (filter === "BLOCKED") return c.status === "SUPPRESSED" || c.status === "UNRECOVERABLE";
       if (filter === "RECOVERED") return c.status === "RECOVERED";
-      if (filter === "HUMAN_REVIEW") return c.status === "HUMAN_REVIEW";
+      if (filter === "HUMAN_REVIEW") return c.status === "AWAITING_APPROVAL";
       return true;
     });
   }, [initialCases, filter]);
@@ -204,12 +213,13 @@ export function CasesTable({ initialCases }: { initialCases: Case[] }) {
 function getStatusColor(status: string) {
   switch (status) {
     case 'RECOVERED': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
-    case 'PENDING': 
-    case 'EXECUTING': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30';
-    case 'HUMAN_REVIEW': return 'bg-orange-500/10 text-orange-400 border-orange-500/30';
-    case 'FAILED': 
+    case 'OPEN':
+    case 'ANALYZING':
+    case 'ACTION_INITIATED':
+    case 'VERIFYING': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30';
+    case 'AWAITING_APPROVAL': return 'bg-orange-500/10 text-orange-400 border-orange-500/30';
     case 'UNRECOVERABLE':
-    case 'BLOCKED': return 'bg-rose-500/10 text-rose-400 border-rose-500/30';
+    case 'SUPPRESSED': return 'bg-rose-500/10 text-rose-400 border-rose-500/30';
     default: return 'bg-white/5 text-white/60 border-white/10';
   }
 }

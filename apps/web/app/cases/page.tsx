@@ -40,7 +40,9 @@ export default async function CasesPage({ searchParams }: { searchParams: any })
         </header>
 
         {/* Client-side Table */}
-        <CasesTable initialCases={cases} />
+        <Suspense fallback={<div className="p-8 text-center text-white/50">Loading cases...</div>}>
+          <CasesTable initialCases={cases} />
+        </Suspense>
 
       </div>
     </div>
