@@ -200,7 +200,7 @@ async def get_case(case_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
                 "id": str(ca.id),
                 "action_type": ca.action_type.value if hasattr(ca.action_type, 'value') else ca.action_type,
                 "expected_value_paise": ca.expected_value_paise,
-                "probability": ca.probability,
+                "success_probability": ca.success_probability,
                 "rank": ca.rank
             } for ca in sorted(c.candidate_actions, key=lambda x: (x.rank is None, x.rank))
         ],
