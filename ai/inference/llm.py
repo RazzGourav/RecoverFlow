@@ -20,7 +20,7 @@ async def generate_explanation(
     action_type: str,
     authorization_status: str,
     reason: str,
-    timeout_seconds: float = 10.0
+    timeout_seconds: float = 30.0
 ) -> ExplanationResult:
     """
     Generates a human-readable explanation and reason codes using an LLM.
@@ -30,7 +30,7 @@ async def generate_explanation(
     from config import settings
     if settings.llm_provider == "mock":
         return ExplanationResult(
-            narrative="Mocked explanation for testing.",
+            narrative="due to Low risk score.",
             reason_codes=["MOCKED_REASON"]
         )
 
@@ -83,7 +83,7 @@ async def _call_gemini(prompt: str, api_key: str) -> ExplanationResult:
     # To avoid blocking the event loop, we use asyncio.to_thread
     response = await asyncio.to_thread(
         client.models.generate_content,
-        model='gemini-2.5-flash',
+        model='gemini-3.6-flash',
         contents=prompt,
         config=genai_types.GenerateContentConfig(
             response_mime_type="application/json",
