@@ -154,7 +154,8 @@ async def simulate_strategy_batch(
 
             # 2. Prevent ARQ job enqueueing and Mock External Calls
             with patch("integrations.factory.get_validator") as mock_get_val, \
-                 patch("integrations.factory.get_provider") as mock_get_prov:
+                 patch("integrations.factory.get_provider") as mock_get_prov, \
+                 patch("ai.inference.llm.generate_explanation") as mock_gen_exp:
                  
                 # Mock the validator to always pass
                 mock_validator = mock_get_val.return_value
@@ -164,6 +165,11 @@ async def simulate_strategy_batch(
                 # We need the validator outcome to be exactly ValidationOutcome with status VALID
                 from integrations.validation import ValidationOutcome, ValidationStatus
                 mock_validator.return_value = ValidationOutcome(status=ValidationStatus.VALID, reason="Simulation")
+
+                from ai.inference.llm import ExplanationResult
+                async def fake_explanation(*args, **kwargs):
+                    return ExplanationResult(narrative="Simulation explanation", reason_codes=["SIMULATED"])
+                mock_gen_exp.side_effect = fake_explanation
 
                 # Mock provider to not actually hit Razorpay
                 mock_provider = mock_get_prov.return_value
